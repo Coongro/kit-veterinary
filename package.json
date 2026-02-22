@@ -1,0 +1,59 @@
+{
+  "name": "@coongro/kit-veterinary",
+  "version": "0.1.1",
+  "type": "module",
+  "description": "Kit base para gestión veterinaria. Incluye pacientes, consultas, productos y contactos.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    }
+  },
+  "files": [
+    "dist",
+    "assets",
+    "coongro.manifest.json"
+  ],
+  "scripts": {
+    "build": "npm run build:css && tsc",
+    "build:css": "tailwindcss -c tailwind.config.cjs -i ./src/styles/tailwind.css -o ./dist/assets/tailwind.css --minify",
+    "dev": "npm run build:css && tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/ --ext .ts,.tsx",
+    "lint:fix": "eslint src/ --ext .ts,.tsx --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
+    "quality": "npm run typecheck && npm run lint && npm run format:check",
+    "quality:fix": "npm run lint:fix && npm run format",
+    "sync-version": "node scripts/sync-version.cjs",
+    "version": "npm run sync-version && git add coongro.manifest.json",
+    "prepublishOnly": "npm run quality && npm run build"
+  },
+  "publishConfig": {
+    "registry": "https://registry.coongro.com/"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@coongro/consultations": "*"
+  },
+  "peerDependencies": {
+    "@coongro/plugin-sdk": ">=0.13.0"
+  },
+  "devDependencies": {
+    "@coongro/plugin-sdk": "workspace:*",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.29.0",
+    "prettier": "^3.2.0"
+  }
+}

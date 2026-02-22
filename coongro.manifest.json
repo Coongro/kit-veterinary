@@ -1,0 +1,31 @@
+{
+  "id": "kit-veterinary",
+  "version": "0.1.1",
+  "apiVersion": "2.0",
+  "initView": "kit-veterinary.dashboard.open",
+  "assets": {
+    "styles": [
+      "./dist/assets/tailwind.css"
+    ]
+  },
+  "contributes": {
+    "menus": [
+      {
+        "path": "Dashboard",
+        "order": 0,
+        "viewId": "kit-veterinary.dashboard.open",
+        "icon": "assets/icons/dashboard.svg",
+        "color": "#6366F1"
+      }
+    ],
+    "views": [
+      {
+        "id": "kit-veterinary.dashboard.open",
+        "title": "Dashboard",
+        "component": "./dist/views/dashboard/index.js",
+        "export": "DashboardView"
+      }
+    ],
+    "repositories": []
+  }
+}
