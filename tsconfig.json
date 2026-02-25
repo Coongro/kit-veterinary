@@ -33,6 +33,12 @@
       ],
       "@coongro/ui-components": [
         "../../packages/ui-components/dist/index.d.ts"
+      ],
+      "@coongro/consultations": [
+        "../consultations/dist/index.d.ts"
+      ],
+      "@coongro/patients": [
+        "../patients/dist/index.d.ts"
       ]
     }
   },

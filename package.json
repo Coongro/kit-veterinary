@@ -42,7 +42,8 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@coongro/consultations": "*"
+    "@coongro/consultations": "*",
+    "@coongro/patients": "*"
   },
   "peerDependencies": {
     "@coongro/plugin-sdk": ">=0.13.0"
