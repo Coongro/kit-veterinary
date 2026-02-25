@@ -1,3 +1,5 @@
+import { CreateConsultationButton } from '@coongro/consultations';
+import { CreatePetButton } from '@coongro/patients';
 import {
   getHostReact,
   getHostUI,
@@ -351,22 +353,15 @@ export function DashboardView(): React.ReactNode {
       h(
         'div',
         { style: { display: 'flex', gap: '8px' } },
-        h(
-          UI.Button,
-          { size: 'sm', onClick: () => views.open('consultations.form.open', {}, { mode: 'dialog', size: 'xl' }) },
-          h(UI.DynamicIcon, { icon: 'Plus', size: 14 }),
-          ' Nueva Consulta'
-        ),
-        h(
-          UI.Button,
-          {
-            variant: 'outline',
-            size: 'sm',
-            onClick: () => views.open('patients.create.open', {}, { mode: 'dialog', size: 'xl' }),
-          },
-          h(UI.DynamicIcon, { icon: 'Plus', size: 14 }),
-          ' Registrar Paciente'
-        )
+        h(CreateConsultationButton, {
+          label: 'Nueva Consulta',
+          onSuccess: (c) => views.open('consultations.detail.open', { consultationId: c.id }),
+        }),
+        h(CreatePetButton, {
+          label: 'Registrar Paciente',
+          variant: 'outline',
+          onSuccess: (pet) => views.open('patients.detail.open', { petId: pet.id }),
+        })
       )
     ),
 
@@ -486,7 +481,7 @@ function renderTodayConsultations(
                   {
                     key: c.id,
                     onClick: () =>
-                      views.open('consultations.detail.open', { consultationId: c.id }, { mode: 'dialog', size: 'xl' }),
+                      views.open('consultations.detail.open', { consultationId: c.id }),
                     style: { cursor: 'pointer' },
                   },
                   h(
@@ -550,7 +545,7 @@ function renderFollowUpItem(
     'div',
     {
       key: c.id,
-      onClick: () => views.open('consultations.detail.open', { consultationId: c.id }, { mode: 'dialog', size: 'xl' }),
+      onClick: () => views.open('consultations.detail.open', { consultationId: c.id }),
       style: {
         padding: '10px 12px',
         borderRadius: '8px',
