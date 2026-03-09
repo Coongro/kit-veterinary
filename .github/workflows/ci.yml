@@ -16,10 +16,9 @@ jobs:
           node-version: 20
 
       - name: Configure @coongro registry
-        run: npm config set @coongro:registry ${{ secrets.STAGING_VERDACCIO_URL }}
-
-      - name: Authenticate with registry
-        run: npm config set //${{ secrets.STAGING_VERDACCIO_URL_HOST }}/:_authToken ${{ secrets.STAGING_VERDACCIO_TOKEN }}
+        run: |
+          echo "@coongro:registry=${{ secrets.STAGING_VERDACCIO_URL }}" > .npmrc
+          echo "//${{ secrets.STAGING_VERDACCIO_URL_HOST }}/:_authToken=${{ secrets.STAGING_VERDACCIO_TOKEN }}" >> .npmrc
 
       - run: npm install
 
