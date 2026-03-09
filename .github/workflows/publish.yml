@@ -41,8 +41,8 @@ jobs:
 
       - name: Configure @coongro registry
         run: |
-          npm config set @coongro:registry ${{ steps.env.outputs.registry_url }}
-          npm config set //${{ steps.env.outputs.registry_host }}/:_authToken ${{ steps.env.outputs.registry_token }}
+          echo "@coongro:registry=${{ steps.env.outputs.registry_url }}" > .npmrc
+          echo "//${{ steps.env.outputs.registry_host }}/:_authToken=${{ steps.env.outputs.registry_token }}" >> .npmrc
 
       - run: npm install
       - run: npm run build
