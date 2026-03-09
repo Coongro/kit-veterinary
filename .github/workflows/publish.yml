@@ -3,6 +3,15 @@ name: Publish
 on:
   push:
     branches: [staging, main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
 
 jobs:
   publish:
@@ -18,7 +27,7 @@ jobs:
       - name: Determine environment
         id: env
         run: |
-          if [ "${{ github.ref_name }}" = "main" ]; then
+          if [ "${{ inputs.environment }}" = "production" ] || [ "${{ github.ref_name }}" = "main" ]; then
             echo "registry_url=${{ secrets.PROD_VERDACCIO_URL }}" >> $GITHUB_OUTPUT
             echo "registry_host=${{ secrets.PROD_VERDACCIO_URL_HOST }}" >> $GITHUB_OUTPUT
             echo "registry_token=${{ secrets.PROD_VERDACCIO_TOKEN }}" >> $GITHUB_OUTPUT
