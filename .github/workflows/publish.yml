@@ -1,0 +1,57 @@
+name: Publish
+
+on:
+  push:
+    branches: [staging, main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  publish:
+    name: Build & Publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Determine environment
+        id: env
+        run: |
+          if [ "${{ inputs.environment }}" = "production" ] || [ "${{ github.ref_name }}" = "main" ]; then
+            echo "registry_url=${{ secrets.PROD_VERDACCIO_URL }}" >> $GITHUB_OUTPUT
+            echo "registry_host=${{ secrets.PROD_VERDACCIO_URL_HOST }}" >> $GITHUB_OUTPUT
+            echo "registry_token=${{ secrets.PROD_VERDACCIO_TOKEN }}" >> $GITHUB_OUTPUT
+            echo "environment=production" >> $GITHUB_OUTPUT
+          else
+            echo "registry_url=${{ secrets.STAGING_VERDACCIO_URL }}" >> $GITHUB_OUTPUT
+            echo "registry_host=${{ secrets.STAGING_VERDACCIO_URL_HOST }}" >> $GITHUB_OUTPUT
+            echo "registry_token=${{ secrets.STAGING_VERDACCIO_TOKEN }}" >> $GITHUB_OUTPUT
+            echo "environment=staging" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Configure registry
+        run: |
+          echo "@coongro:registry=${{ steps.env.outputs.registry_url }}" > .npmrc
+          echo "//${{ steps.env.outputs.registry_host }}/:_authToken=${{ steps.env.outputs.registry_token }}" >> .npmrc
+
+      - run: npm install
+      - run: npm run build
+
+      - name: Publish to ${{ steps.env.outputs.environment }} Verdaccio
+        run: npm publish --ignore-scripts --registry ${{ steps.env.outputs.registry_url }}
+
+      - name: Summary
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          NAME=$(node -p "require('./package.json').name")
+          echo "### Published $NAME@$VERSION to ${{ steps.env.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
