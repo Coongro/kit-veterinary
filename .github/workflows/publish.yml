@@ -39,12 +39,9 @@ jobs:
             echo "environment=staging" >> $GITHUB_OUTPUT
           fi
 
-      - name: Configure registries
+      - name: Configure registry
         run: |
-          # Core @coongro/* packages from GitHub Packages (read-only)
-          echo "@coongro:registry=https://npm.pkg.github.com" > .npmrc
-          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GH_PACKAGES_TOKEN }}" >> .npmrc
-          # Verdaccio auth for publishing and resolving other plugins
+          echo "@coongro:registry=${{ steps.env.outputs.registry_url }}" > .npmrc
           echo "//${{ steps.env.outputs.registry_host }}/:_authToken=${{ steps.env.outputs.registry_token }}" >> .npmrc
 
       - run: npm install
