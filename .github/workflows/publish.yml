@@ -48,7 +48,7 @@ jobs:
       - run: npm run build
 
       - name: Publish to ${{ steps.env.outputs.environment }} Verdaccio
-        run: npm publish --registry ${{ steps.env.outputs.registry_url }}
+        run: npm publish --ignore-scripts --registry ${{ steps.env.outputs.registry_url }}
 
       - name: Summary
         run: |
