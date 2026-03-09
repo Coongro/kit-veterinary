@@ -1,20 +1,12 @@
 name: CI
 
-# Quality checks (typecheck, lint, format) se ejecutan localmente en el monorepo
-# donde pnpm resuelve workspace:* y el plugin-sdk está disponible.
-# Este workflow se activará cuando el SDK esté publicado en un registry accesible.
-# Para activar: eliminar la línea "if: false" del job quality.
-
 on:
-  push:
-    branches: [main]
   pull_request:
-    branches: [main]
+    branches: [develop, staging, main]
 
 jobs:
   quality:
     name: Quality & Build
-    if: false # Deshabilitado hasta que @coongro/plugin-sdk esté en un registry público
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -23,23 +15,22 @@ jobs:
         with:
           node-version: 20
 
-      - name: Prepare for standalone CI
-        run: |
-          rm -f .npmrc
-          sed -i 's/"workspace:\*"/">=0.1.0"/g' package.json
+      - name: Configure @coongro registry
+        run: npm config set @coongro:registry ${{ secrets.STAGING_VERDACCIO_URL }}
+
+      - name: Authenticate with registry
+        run: npm config set //${{ secrets.STAGING_VERDACCIO_URL_HOST }}/:_authToken ${{ secrets.STAGING_VERDACCIO_TOKEN }}
 
       - run: npm install
 
-      # Orden: Prettier → ESLint → Typecheck → Build
-      # Mismo orden que lint-staged y CI del monorepo
+      - name: Typecheck
+        run: npm run typecheck
+
       - name: Format check
         run: npm run format:check
 
       - name: Lint
         run: npm run lint
-
-      - name: Typecheck
-        run: npm run typecheck
 
       - name: Build
         run: npm run build
