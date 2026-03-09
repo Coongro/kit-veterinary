@@ -17,8 +17,8 @@ jobs:
 
       - name: Configure @coongro registry
         run: |
-          echo "@coongro:registry=${{ secrets.STAGING_VERDACCIO_URL }}" > .npmrc
-          echo "//${{ secrets.STAGING_VERDACCIO_URL_HOST }}/:_authToken=${{ secrets.STAGING_VERDACCIO_TOKEN }}" >> .npmrc
+          echo "@coongro:registry=https://npm.pkg.github.com" > .npmrc
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GH_PACKAGES_TOKEN }}" >> .npmrc
 
       - run: npm install
 
