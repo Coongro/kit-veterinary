@@ -36,3 +36,8 @@ jobs:
           git add package.json coongro.manifest.json
           git commit -m "chore: bump version to $new_version"
           git push
+
+      - name: Trigger publish
+        run: gh workflow run publish.yml --ref staging -f environment=staging
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
