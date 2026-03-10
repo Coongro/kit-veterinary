@@ -1,21 +1,13 @@
-name: Publish
+name: Publish Production
 
 on:
   push:
-    branches: [staging, main]
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Target environment'
-        required: true
-        type: choice
-        options:
-          - staging
-          - production
 
 jobs:
   publish:
-    name: Build & Publish
+    name: Build & Publish to Production
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -24,34 +16,21 @@ jobs:
         with:
           node-version: 20
 
-      - name: Determine environment
-        id: env
-        run: |
-          if [ "${{ inputs.environment }}" = "production" ] || [ "${{ github.ref_name }}" = "main" ]; then
-            echo "registry_url=${{ secrets.PROD_VERDACCIO_URL }}" >> $GITHUB_OUTPUT
-            echo "registry_host=${{ secrets.PROD_VERDACCIO_URL_HOST }}" >> $GITHUB_OUTPUT
-            echo "registry_token=${{ secrets.PROD_VERDACCIO_TOKEN }}" >> $GITHUB_OUTPUT
-            echo "environment=production" >> $GITHUB_OUTPUT
-          else
-            echo "registry_url=${{ secrets.STAGING_VERDACCIO_URL }}" >> $GITHUB_OUTPUT
-            echo "registry_host=${{ secrets.STAGING_VERDACCIO_URL_HOST }}" >> $GITHUB_OUTPUT
-            echo "registry_token=${{ secrets.STAGING_VERDACCIO_TOKEN }}" >> $GITHUB_OUTPUT
-            echo "environment=staging" >> $GITHUB_OUTPUT
-          fi
-
       - name: Configure registry
         run: |
-          echo "@coongro:registry=${{ steps.env.outputs.registry_url }}" > .npmrc
-          echo "//${{ steps.env.outputs.registry_host }}/:_authToken=${{ steps.env.outputs.registry_token }}" >> .npmrc
+          echo "@coongro:registry=${{ secrets.STAGING_VERDACCIO_URL }}" > .npmrc
+          echo "//${{ secrets.STAGING_VERDACCIO_URL_HOST }}/:_authToken=${{ secrets.STAGING_VERDACCIO_TOKEN }}" >> .npmrc
 
       - run: npm install
       - run: npm run build
 
-      - name: Publish to ${{ steps.env.outputs.environment }} Verdaccio
-        run: npm publish --ignore-scripts --registry ${{ steps.env.outputs.registry_url }}
+      - name: Publish to production Verdaccio
+        run: |
+          echo "//${{ secrets.PROD_VERDACCIO_URL_HOST }}/:_authToken=${{ secrets.PROD_VERDACCIO_TOKEN }}" >> .npmrc
+          npm publish --ignore-scripts --registry ${{ secrets.PROD_VERDACCIO_URL }}
 
       - name: Summary
         run: |
           VERSION=$(node -p "require('./package.json').version")
           NAME=$(node -p "require('./package.json').name")
-          echo "### Published $NAME@$VERSION to ${{ steps.env.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "### Published $NAME@$VERSION to production" >> $GITHUB_STEP_SUMMARY
