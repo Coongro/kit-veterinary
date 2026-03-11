@@ -28,7 +28,7 @@ jobs:
         id: changesets
         uses: changesets/action@v1
         with:
-          version: npx changeset version && node scripts/sync-version.cjs
+          version: sh scripts/changeset-version.sh
           publish: npm publish --ignore-scripts --registry ${{ secrets.STAGING_VERDACCIO_URL }}
           title: "Version Packages"
           commit: "chore: version packages"
