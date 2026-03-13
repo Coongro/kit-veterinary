@@ -340,7 +340,7 @@ export function DashboardView(): React.ReactNode {
     { className: 'p-6 min-h-screen bg-cg-bg-secondary font-sans' },
     h(
       'div',
-      { className: 'max-w-6xl mx-auto' },
+      { className: 'w-full' },
 
       // Encabezado
       h(
@@ -500,7 +500,7 @@ export function DashboardView(): React.ReactNode {
           s.render() as React.ReactNode
         )
       )
-    ) // max-w-6xl wrapper
+    )
   );
 }
 
