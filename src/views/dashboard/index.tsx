@@ -85,9 +85,9 @@ function formatDateShort(iso: string): string {
 
 function formatDateLong(iso: string): string {
   return new Date(iso).toLocaleDateString('es-AR', {
-    weekday: 'short',
+    weekday: 'long',
     day: 'numeric',
-    month: 'short',
+    month: 'long',
   });
 }
 
@@ -165,7 +165,13 @@ function computeTopServices(
 // --- Helpers de render ---
 
 function trendFooter(trend: { text: string; color: string }, label: string): React.ReactNode {
-  return h('span', { style: { color: trend.color } }, trend.text, ` ${label}`);
+  if (!trend.text) return h('span', { style: { color: 'var(--cg-text-muted)' } }, label);
+  return h(
+    'span',
+    null,
+    h('span', { style: { color: trend.color, fontWeight: '700' } }, trend.text),
+    h('span', { style: { color: 'var(--cg-text-muted)', fontWeight: '400' } }, ` ${label}`)
+  );
 }
 
 // --- Componente principal ---
@@ -184,7 +190,6 @@ export function DashboardView(): React.ReactNode {
     today: todayStr(),
   });
 
-  // Patrón correcto para React 18 StrictMode: variable local por efecto
   useEffect(() => {
     let cancelled = false;
 
@@ -242,13 +247,13 @@ export function DashboardView(): React.ReactNode {
   );
 
   const revenueToday = useMemo(() => {
-    const ids = new Set(todayConsultations.map((c) => c.id));
+    const ids = new Set<string>(todayConsultations.map((c) => c.id));
     return sumRevenueForIds(ids, services);
   }, [todayConsultations, services]);
 
   const revenueYesterday = useMemo(() => {
     const yesterday = daysFromNow(-1);
-    const ids = new Set(
+    const ids = new Set<string>(
       consultations.filter((c) => dateKey(c.date) === yesterday).map((c) => c.id)
     );
     return sumRevenueForIds(ids, services);
@@ -312,130 +317,190 @@ export function DashboardView(): React.ReactNode {
   const maxRevenue = Math.max(...revenueDays.map((d) => d.revenue), 1);
   const maxServiceRevenue = topServices.length > 0 ? topServices[0].revenue : 1;
 
+  // Resumen para el subtítulo del header
+  const headerSubtitle = (() => {
+    if (todayConsultations.length === 0 && followUps.length === 0)
+      return formatDateLong(new Date().toISOString());
+    const parts: string[] = [formatDateLong(new Date().toISOString())];
+    if (todayConsultations.length > 0)
+      parts.push(
+        `${todayConsultations.length} consulta${todayConsultations.length > 1 ? 's' : ''} hoy`
+      );
+    if (followUps.length > 0)
+      parts.push(
+        `${followUps.length} seguimiento${followUps.length > 1 ? 's' : ''} pendiente${followUps.length > 1 ? 's' : ''}`
+      );
+    return parts.join(' · ');
+  })();
+
   // --- Render ---
 
   return h(
     'div',
-    {
-      style: {
-        padding: '24px',
-        minHeight: '100vh',
-        backgroundColor: 'var(--cg-bg-secondary)',
-        fontFamily: 'var(--cg-font-sans, Inter, system-ui, sans-serif)',
-      },
-    },
-
-    // Encabezado
+    { className: 'p-6 min-h-screen bg-cg-bg-secondary font-sans' },
     h(
-      'header',
-      {
-        style: {
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '24px',
-        },
-      },
+      'div',
+      { className: 'max-w-6xl mx-auto' },
+
+      // Encabezado
       h(
-        'div',
-        null,
+        'header',
+        {
+          style: {
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '24px',
+            gap: '16px',
+          },
+        },
         h(
-          'h1',
-          { style: { fontSize: '24px', fontWeight: '700', color: 'var(--cg-text)', margin: 0 } },
-          'Dashboard'
+          'div',
+          null,
+          h(
+            'h1',
+            {
+              style: {
+                fontSize: '22px',
+                fontWeight: '700',
+                color: 'var(--cg-text)',
+                margin: 0,
+                textTransform: 'capitalize',
+              },
+            },
+            formatDateLong(new Date().toISOString())
+          ),
+          h(
+            'p',
+            { style: { fontSize: '13px', color: 'var(--cg-text-muted)', marginTop: '2px' } },
+            headerSubtitle !== formatDateLong(new Date().toISOString())
+              ? // Mostrar resumen sin la fecha (ya está en el H1)
+                (() => {
+                  const parts: string[] = [];
+                  if (todayConsultations.length > 0)
+                    parts.push(
+                      `${todayConsultations.length} consulta${todayConsultations.length > 1 ? 's' : ''} hoy`
+                    );
+                  if (followUps.length > 0)
+                    parts.push(
+                      `${followUps.length} seguimiento${followUps.length > 1 ? 's' : ''} pendiente${followUps.length > 1 ? 's' : ''}`
+                    );
+                  return parts.join(' · ') || 'Sin actividad por el momento';
+                })()
+              : 'Sin actividad por el momento'
+          )
         ),
         h(
-          'p',
-          { style: { fontSize: '13px', color: 'var(--cg-text-muted)', marginTop: '2px' } },
-          formatDateLong(new Date().toISOString())
+          'div',
+          { style: { display: 'flex', gap: '8px', flexShrink: 0 } },
+          h(CreateConsultationButton, {
+            label: 'Nueva Consulta',
+            onSuccess: (c) => views.open('consultations.detail.open', { consultationId: c.id }),
+          }),
+          h(CreatePetButton, {
+            label: 'Registrar Paciente',
+            variant: 'outline',
+            onSuccess: (pet) => views.open('patients.detail.open', { petId: pet.id }),
+          })
         )
       ),
+
+      // Tarjetas KPI
       h(
         'div',
-        { style: { display: 'flex', gap: '8px' } },
-        h(CreateConsultationButton, {
-          label: 'Nueva Consulta',
-          onSuccess: (c) => views.open('consultations.detail.open', { consultationId: c.id }),
+        {
+          style: {
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '16px',
+            marginBottom: '24px',
+          },
+        },
+        h(UI.StatCard, {
+          label: 'Consultas Hoy',
+          value: todayConsultations.length,
+          icon: h(UI.DynamicIcon, { icon: 'Stethoscope', size: 28 }),
+          footer: trendFooter(consultationTrend, 'vs sem. anterior'),
+          onClick: () => views.open('consultations.list.open', {}),
+          style: { cursor: 'pointer', transition: 'opacity 0.15s' },
+          onMouseEnter: (e: React.MouseEvent<HTMLDivElement>) => {
+            (e.currentTarget as HTMLDivElement).style.opacity = '0.85';
+          },
+          onMouseLeave: (e: React.MouseEvent<HTMLDivElement>) => {
+            (e.currentTarget as HTMLDivElement).style.opacity = '1';
+          },
         }),
-        h(CreatePetButton, {
-          label: 'Registrar Paciente',
-          variant: 'outline',
-          onSuccess: (pet) => views.open('patients.detail.open', { petId: pet.id }),
+        h(UI.StatCard, {
+          label: 'Ingresos Hoy',
+          value: formatCurrency(revenueToday),
+          icon: h(UI.DynamicIcon, { icon: 'DollarSign', size: 28 }),
+          footer: trendFooter(revenueTrend, 'vs ayer'),
+        }),
+        h(UI.StatCard, {
+          label: 'Pacientes Activos',
+          value: activePatients,
+          icon: h(UI.DynamicIcon, { icon: 'PawPrint', size: 28 }),
+          footer: h(
+            'span',
+            { style: { color: 'var(--cg-text-muted)', fontWeight: '400' } },
+            `de ${pets.length} registrados`
+          ),
+          onClick: () => views.open('patients.list.open', {}),
+          style: { cursor: 'pointer', transition: 'opacity 0.15s' },
+          onMouseEnter: (e: React.MouseEvent<HTMLDivElement>) => {
+            (e.currentTarget as HTMLDivElement).style.opacity = '0.85';
+          },
+          onMouseLeave: (e: React.MouseEvent<HTMLDivElement>) => {
+            (e.currentTarget as HTMLDivElement).style.opacity = '1';
+          },
+        }),
+        h(UI.StatCard, {
+          label: 'Clientes Nuevos',
+          value: newClientsMonth,
+          icon: h(UI.DynamicIcon, { icon: 'UserPlus', size: 28 }),
+          footer: trendFooter(clientTrend, 'vs mes anterior'),
         })
-      )
-    ),
+      ),
 
-    // Tarjetas KPI
-    h(
-      'div',
-      {
-        style: {
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px',
-          marginBottom: '24px',
-        },
-      },
-      h(UI.StatCard, {
-        label: 'Consultas Hoy',
-        value: todayConsultations.length,
-        footer: trendFooter(consultationTrend, 'vs mismo día sem. pasada'),
-      }),
-      h(UI.StatCard, {
-        label: 'Ingresos Hoy',
-        value: formatCurrency(revenueToday),
-        footer: trendFooter(revenueTrend, 'vs ayer'),
-      }),
-      h(UI.StatCard, {
-        label: 'Pacientes Activos',
-        value: activePatients,
-        footer: `de ${pets.length} totales (últ. 12 meses)`,
-      }),
-      h(UI.StatCard, {
-        label: 'Clientes Nuevos',
-        value: newClientsMonth,
-        footer: trendFooter(clientTrend, 'este mes vs anterior'),
-      })
-    ),
-
-    // Consultas de Hoy + Seguimientos
-    h(
-      'div',
-      {
-        style: {
-          display: 'grid',
-          gridTemplateColumns: '2fr 1fr',
-          gap: '16px',
-          marginBottom: '24px',
-        },
-      },
-      renderTodayConsultations(todayConsultations, petMap, views),
-      renderFollowUps(followUps, petMap, today, views)
-    ),
-
-    // Gráficos: Ingresos 7 días + Servicios Top
-    h(
-      'div',
-      {
-        style: {
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '16px',
-          marginBottom: '24px',
-        },
-      },
-      renderRevenueChart(revenueDays, maxRevenue),
-      renderTopServices(topServices, maxServiceRevenue)
-    ),
-
-    // Secciones contribuidas por add-ons
-    ...contributedSections.map((s, i) =>
+      // Consultas de Hoy + Seguimientos
       h(
         'div',
-        { key: `contrib-${String(i)}`, style: { marginBottom: '16px' } },
-        s.render() as React.ReactNode
+        {
+          style: {
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)',
+            gap: '16px',
+            marginBottom: '24px',
+          },
+        },
+        renderTodayConsultations(todayConsultations, petMap, views),
+        renderFollowUps(followUps, petMap, today, views)
+      ),
+
+      // Gráficos: Ingresos 7 días + Servicios Top
+      h(
+        'div',
+        {
+          style: {
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+            gap: '16px',
+            marginBottom: '24px',
+          },
+        },
+        renderRevenueChart(revenueDays, maxRevenue),
+        renderTopServices(topServices, maxServiceRevenue, views)
+      ),
+
+      // Secciones contribuidas por add-ons
+      ...contributedSections.map((s, i) =>
+        h(
+          'div',
+          { key: `contrib-${String(i)}`, style: { marginBottom: '16px' } },
+          s.render() as React.ReactNode
+        )
       )
-    )
+    ) // max-w-6xl wrapper
   );
 }
 
@@ -454,7 +519,16 @@ function renderTodayConsultations(
       UI.CardBody,
       null,
       todayConsultations.length === 0
-        ? h(UI.EmptyState, { title: 'Sin consultas hoy' })
+        ? h(UI.EmptyState, {
+            icon: h(UI.DynamicIcon, {
+              icon: 'CalendarX2',
+              size: 24,
+              className: 'text-cg-text-muted',
+            }),
+            title: 'Sin consultas por ahora',
+            description: 'Las consultas agendadas para hoy aparecerán aquí.',
+            action: h(CreateConsultationButton, { label: 'Registrar consulta' }),
+          })
         : h(
             UI.Table,
             null,
@@ -522,7 +596,15 @@ function renderFollowUps(
       UI.CardBody,
       null,
       followUps.length === 0
-        ? h(UI.EmptyState, { title: 'Sin seguimientos próximos' })
+        ? h(UI.EmptyState, {
+            icon: h(UI.DynamicIcon, {
+              icon: 'CalendarCheck',
+              size: 24,
+              className: 'text-cg-text-muted',
+            }),
+            title: 'Todo al día',
+            description: 'No hay seguimientos en los próximos 14 días.',
+          })
         : h(
             'div',
             { className: 'flex flex-col gap-2' },
@@ -554,6 +636,13 @@ function renderFollowUpItem(
           : '1px solid var(--cg-border)',
         backgroundColor: isToday ? 'var(--cg-warning-bg, rgba(245,158,11,0.08))' : 'var(--cg-bg)',
         cursor: 'pointer',
+        transition: 'opacity 0.15s',
+      },
+      onMouseEnter: (e: React.MouseEvent<HTMLDivElement>) => {
+        (e.currentTarget as HTMLDivElement).style.opacity = '0.75';
+      },
+      onMouseLeave: (e: React.MouseEvent<HTMLDivElement>) => {
+        (e.currentTarget as HTMLDivElement).style.opacity = '1';
       },
     },
     h(
@@ -615,28 +704,42 @@ function renderRevenueChart(
       h(
         'div',
         { className: 'flex flex-col gap-2' },
-        ...revenueDays.map((d) =>
-          h(
+        ...revenueDays.map((d, i) => {
+          const isToday = i === revenueDays.length - 1;
+          return h(
             'div',
             { key: d.date, className: 'flex items-center gap-2' },
             h(
               'span',
-              { className: 'w-12 shrink-0 text-right text-xs text-cg-text-muted' },
+              {
+                className: 'w-12 shrink-0 text-right text-xs',
+                style: {
+                  color: isToday ? 'var(--cg-text)' : 'var(--cg-text-muted)',
+                  fontWeight: isToday ? '600' : '400',
+                },
+              },
               d.label
             ),
             h(UI.ProgressBar, {
               value: d.revenue,
               max: maxRevenue,
               size: 'lg',
+              variant: isToday ? 'brand' : 'default',
               className: 'flex-1',
             }),
             h(
               'span',
-              { className: 'w-20 shrink-0 text-right text-xs font-medium text-cg-text' },
+              {
+                className: 'w-20 shrink-0 text-right text-xs',
+                style: {
+                  color: isToday ? 'var(--cg-text)' : 'var(--cg-text-muted)',
+                  fontWeight: isToday ? '600' : '400',
+                },
+              },
               formatCurrency(d.revenue)
             )
-          )
-        )
+          );
+        })
       )
     )
   );
@@ -644,7 +747,8 @@ function renderRevenueChart(
 
 function renderTopServices(
   topServices: Array<{ name: string; count: number; revenue: number }>,
-  maxServiceRevenue: number
+  maxServiceRevenue: number,
+  views: ReturnType<typeof usePlugin>['views']
 ): React.ReactNode {
   return h(
     UI.Card,
@@ -654,7 +758,20 @@ function renderTopServices(
       UI.CardBody,
       null,
       topServices.length === 0
-        ? h(UI.EmptyState, { title: 'Sin servicios registrados' })
+        ? h(UI.EmptyState, {
+            icon: h(UI.DynamicIcon, { icon: 'Package', size: 24, className: 'text-cg-text-muted' }),
+            title: 'Sin servicios registrados',
+            description: 'Los servicios aparecen al registrar consultas con productos.',
+            action: h(
+              UI.Button,
+              {
+                variant: 'outline',
+                size: 'sm',
+                onClick: () => views.open('consultations.list.open', {}),
+              },
+              'Ver consultas'
+            ),
+          })
         : h(
             'div',
             { className: 'flex flex-col gap-2.5' },
