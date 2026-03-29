@@ -1,5 +1,11 @@
 # @coongro/kit-veterinary
 
+## 0.1.5
+
+### Patch Changes
+
+- 9092bc4: Disable Tailwind preflight to avoid duplicating host CSS reset
+
 ## 0.1.4
 
 ### Patch Changes
