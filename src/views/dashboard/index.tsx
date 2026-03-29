@@ -13,6 +13,17 @@ const UI = getHostUI();
 const { useState, useEffect, useMemo } = React;
 const h = React.createElement;
 
+/** Hook para detectar si el viewport es mobile (<768px) */
+function useIsMobile(breakpoint = 768): boolean {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < breakpoint);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < breakpoint);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, [breakpoint]);
+  return isMobile;
+}
+
 // --- Tipos ---
 
 interface Consultation {
@@ -172,6 +183,7 @@ function trendFooter(trend: { text: string; color: string }, label: string): Rea
 
 export function DashboardView(): React.ReactNode {
   const { views } = usePlugin();
+  const isMobile = useIsMobile();
   const [consultations, setConsultations] = useState<Consultation[]>([]);
   const [services, setServices] = useState<ConsultationService[]>([]);
   const [pets, setPets] = useState<Pet[]>([]);
@@ -318,10 +330,9 @@ export function DashboardView(): React.ReactNode {
     'div',
     {
       style: {
-        padding: '24px',
+        padding: isMobile ? '16px' : '24px',
         minHeight: '100vh',
         backgroundColor: 'var(--cg-bg-secondary)',
-        fontFamily: 'var(--cg-font-sans, Inter, system-ui, sans-serif)',
       },
     },
 
@@ -331,9 +342,11 @@ export function DashboardView(): React.ReactNode {
       {
         style: {
           display: 'flex',
-          alignItems: 'center',
+          flexDirection: isMobile ? 'column' : 'row',
+          alignItems: isMobile ? 'flex-start' : 'center',
           justifyContent: 'space-between',
           marginBottom: '24px',
+          gap: '16px',
         },
       },
       h(
@@ -341,18 +354,37 @@ export function DashboardView(): React.ReactNode {
         null,
         h(
           'h1',
-          { style: { fontSize: '24px', fontWeight: '700', color: 'var(--cg-text)', margin: 0 } },
-          'Dashboard'
+          {
+            style: {
+              fontSize: isMobile ? '18px' : '22px',
+              fontWeight: '700',
+              color: 'var(--cg-text)',
+              margin: 0,
+              textTransform: 'capitalize',
+            },
+          },
+          formatDateLong(new Date().toISOString())
         ),
         h(
           'p',
           { style: { fontSize: '13px', color: 'var(--cg-text-muted)', marginTop: '2px' } },
-          formatDateLong(new Date().toISOString())
+          (() => {
+            const parts: string[] = [];
+            if (todayConsultations.length > 0)
+              parts.push(
+                `${todayConsultations.length} consulta${todayConsultations.length > 1 ? 's' : ''} hoy`
+              );
+            if (followUps.length > 0)
+              parts.push(
+                `${followUps.length} seguimiento${followUps.length > 1 ? 's' : ''} pendiente${followUps.length > 1 ? 's' : ''}`
+              );
+            return parts.join(' · ') || 'Sin actividad por el momento';
+          })()
         )
       ),
       h(
         'div',
-        { style: { display: 'flex', gap: '8px' } },
+        { style: { display: 'flex', gap: '8px', flexShrink: 0 } },
         h(CreateConsultationButton, {
           label: 'Nueva Consulta',
           onSuccess: (c) => views.open('consultations.detail.open', { consultationId: c.id }),
@@ -404,12 +436,12 @@ export function DashboardView(): React.ReactNode {
       {
         style: {
           display: 'grid',
-          gridTemplateColumns: '2fr 1fr',
+          gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 2fr) minmax(0, 1fr)',
           gap: '16px',
           marginBottom: '24px',
         },
       },
-      renderTodayConsultations(todayConsultations, petMap, views),
+      renderTodayConsultations(todayConsultations, petMap, views, isMobile),
       renderFollowUps(followUps, petMap, today, views)
     ),
 
@@ -419,7 +451,7 @@ export function DashboardView(): React.ReactNode {
       {
         style: {
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
+          gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) minmax(0, 1fr)',
           gap: '16px',
           marginBottom: '24px',
         },
@@ -444,7 +476,8 @@ export function DashboardView(): React.ReactNode {
 function renderTodayConsultations(
   todayConsultations: Consultation[],
   petMap: Map<string, Pet>,
-  views: ReturnType<typeof usePlugin>['views']
+  views: ReturnType<typeof usePlugin>['views'],
+  isMobile = false
 ): React.ReactNode {
   return h(
     UI.Card,
@@ -454,54 +487,71 @@ function renderTodayConsultations(
       UI.CardBody,
       null,
       todayConsultations.length === 0
-        ? h(UI.EmptyState, { title: 'Sin consultas hoy' })
+        ? h(UI.EmptyState, {
+            icon: h(UI.DynamicIcon, {
+              icon: 'CalendarX2',
+              size: 24,
+              className: 'text-cg-text-muted',
+            }),
+            title: 'Sin consultas por ahora',
+            description: 'Las consultas agendadas para hoy aparecerán aquí.',
+            action: h(CreateConsultationButton, { label: 'Registrar consulta' }),
+          })
         : h(
-            UI.Table,
-            null,
+            'div',
+            { style: { overflowX: 'auto' } },
             h(
-              UI.TableHeader,
+              UI.Table,
               null,
               h(
-                UI.TableRow,
+                UI.TableHeader,
                 null,
-                h(UI.TableHead, null, 'Hora'),
-                h(UI.TableHead, null, 'Paciente'),
-                h(UI.TableHead, null, 'Especie'),
-                h(UI.TableHead, null, 'Motivo'),
-                h(UI.TableHead, null, 'Veterinario')
-              )
-            ),
-            h(
-              UI.TableBody,
-              null,
-              ...todayConsultations.map((c) => {
-                const pet = petMap.get(c.pet_id);
-                return h(
+                h(
                   UI.TableRow,
-                  {
-                    key: c.id,
-                    onClick: () =>
-                      views.open('consultations.detail.open', { consultationId: c.id }),
-                    style: { cursor: 'pointer' },
-                  },
-                  h(
-                    UI.TableCell,
-                    null,
-                    new Date(c.date).toLocaleTimeString('es-AR', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })
-                  ),
-                  h(UI.TableCell, { style: { fontWeight: '500' } }, pet?.name ?? '\u2014'),
-                  h(
-                    UI.TableCell,
-                    null,
-                    pet ? h(UI.Badge, { variant: 'secondary', size: 'sm' }, pet.species) : '\u2014'
-                  ),
-                  h(UI.TableCell, null, c.reason),
-                  h(UI.TableCell, { style: { color: 'var(--cg-text-muted)' } }, c.vet_name)
-                );
-              })
+                  null,
+                  h(UI.TableHead, null, 'Hora'),
+                  h(UI.TableHead, null, 'Paciente'),
+                  !isMobile && h(UI.TableHead, null, 'Especie'),
+                  h(UI.TableHead, null, 'Motivo'),
+                  !isMobile && h(UI.TableHead, null, 'Veterinario')
+                )
+              ),
+              h(
+                UI.TableBody,
+                null,
+                ...todayConsultations.map((c) => {
+                  const pet = petMap.get(c.pet_id);
+                  return h(
+                    UI.TableRow,
+                    {
+                      key: c.id,
+                      onClick: () =>
+                        views.open('consultations.detail.open', { consultationId: c.id }),
+                      style: { cursor: 'pointer' },
+                    },
+                    h(
+                      UI.TableCell,
+                      null,
+                      new Date(c.date).toLocaleTimeString('es-AR', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                    ),
+                    h(UI.TableCell, { style: { fontWeight: '500' } }, pet?.name ?? '\u2014'),
+                    !isMobile &&
+                      h(
+                        UI.TableCell,
+                        null,
+                        pet
+                          ? h(UI.Badge, { variant: 'secondary', size: 'sm' }, pet.species)
+                          : '\u2014'
+                      ),
+                    h(UI.TableCell, null, c.reason),
+                    !isMobile &&
+                      h(UI.TableCell, { style: { color: 'var(--cg-text-muted)' } }, c.vet_name)
+                  );
+                })
+              )
             )
           )
     )
