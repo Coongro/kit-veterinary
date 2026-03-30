@@ -1,3 +1,4 @@
+import { toDateString, formatEventDate, formatEventTime, getMonthStart } from '@coongro/calendar';
 import { CreateConsultationButton } from '@coongro/consultations';
 import { CreatePetButton } from '@coongro/patients';
 import {
@@ -62,44 +63,35 @@ interface Contact {
   created_at: string;
 }
 
-// --- Helpers de fecha ---
+// --- Helpers de fecha (basados en @coongro/calendar) ---
 
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  return toDateString(new Date());
 }
 
 function daysFromNow(n: number): string {
   const d = new Date();
   d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
+  return toDateString(d);
 }
 
 function monthStartStr(): string {
   const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+  return toDateString(getMonthStart(d.getFullYear(), d.getMonth()));
 }
 
 function prevMonthRange(): { start: string; end: string } {
   const d = new Date();
-  d.setMonth(d.getMonth() - 1);
-  const start = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
-  return { start, end: monthStartStr() };
+  const prevMonth = d.getMonth() === 0 ? 11 : d.getMonth() - 1;
+  const prevYear = d.getMonth() === 0 ? d.getFullYear() - 1 : d.getFullYear();
+  return {
+    start: toDateString(getMonthStart(prevYear, prevMonth)),
+    end: monthStartStr(),
+  };
 }
 
 function dateKey(iso: string): string {
   return iso.slice(0, 10);
-}
-
-function formatDateShort(iso: string): string {
-  return new Date(iso).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
-}
-
-function formatDateLong(iso: string): string {
-  return new Date(iso).toLocaleDateString('es-AR', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  });
 }
 
 function formatCurrency(value: number): string {
@@ -114,7 +106,7 @@ function formatCurrency(value: number): string {
 function dayLabel(daysAgo: number, dateStr: string): string {
   if (daysAgo === 0) return 'Hoy';
   if (daysAgo === 1) return 'Ayer';
-  return formatDateShort(dateStr);
+  return formatEventDate(dateStr);
 }
 
 // --- Cómputos ---
@@ -363,7 +355,7 @@ export function DashboardView(): React.ReactNode {
               textTransform: 'capitalize',
             },
           },
-          formatDateLong(new Date().toISOString())
+          formatEventDate(new Date().toISOString())
         ),
         h(
           'p',
@@ -529,14 +521,7 @@ function renderTodayConsultations(
                         views.open('consultations.detail.open', { consultationId: c.id }),
                       style: { cursor: 'pointer' },
                     },
-                    h(
-                      UI.TableCell,
-                      null,
-                      new Date(c.date).toLocaleTimeString('es-AR', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })
-                    ),
+                    h(UI.TableCell, null, formatEventTime(c.date)),
                     h(UI.TableCell, { style: { fontWeight: '500' } }, pet?.name ?? '\u2014'),
                     !isMobile &&
                       h(
@@ -629,7 +614,7 @@ function renderFollowUpItem(
             fontWeight: isToday ? '600' : '400',
           },
         },
-        isToday ? 'HOY' : formatDateShort(c.follow_up_date ?? '')
+        isToday ? 'HOY' : formatEventDate(c.follow_up_date ?? '')
       )
     ),
     c.follow_up_notes
