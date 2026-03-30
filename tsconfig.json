@@ -34,6 +34,9 @@
       "@coongro/ui-components": [
         "../../packages/ui-components/dist/index.d.ts"
       ],
+      "@coongro/calendar": [
+        "../calendar/dist/index.d.ts"
+      ],
       "@coongro/consultations": [
         "../consultations/dist/index.d.ts"
       ],
