@@ -1,6 +1,6 @@
 {
   "name": "@coongro/kit-veterinary",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "type": "module",
   "description": "Kit base para gestión veterinaria. Incluye pacientes, consultas, productos y contactos.",
   "main": "dist/index.js",
