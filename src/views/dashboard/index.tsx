@@ -1,5 +1,12 @@
-import { toDateString, formatEventDate, formatEventTime, getMonthStart } from '@coongro/calendar';
+import {
+  toDateString,
+  formatEventDate,
+  formatEventTime,
+  getMonthStart,
+  useTenantTimezone,
+} from '@coongro/calendar';
 import { CreateConsultationButton } from '@coongro/consultations';
+import { addDays, toDateKey, utcToLocal, type DateKey, type UTCTimestamp } from '@coongro/datetime';
 import { CreatePetButton } from '@coongro/patients';
 import {
   getHostReact,
@@ -31,13 +38,13 @@ interface Consultation {
   id: string;
   pet_id: string;
   vet_name: string;
-  date: string;
+  date: UTCTimestamp;
   reason: string;
   reason_category?: string;
   diagnosis?: string;
-  follow_up_date?: string;
+  follow_up_date?: DateKey | null;
   follow_up_notes?: string;
-  created_at: string;
+  created_at: UTCTimestamp;
 }
 
 interface ConsultationService {
@@ -47,7 +54,7 @@ interface ConsultationService {
   quantity: string;
   unit_price: string;
   subtotal: string;
-  created_at: string;
+  created_at: UTCTimestamp;
 }
 
 interface Pet {
@@ -60,38 +67,37 @@ interface Pet {
 interface Contact {
   id: string;
   name: string;
-  created_at: string;
+  created_at: UTCTimestamp;
 }
 
 // --- Helpers de fecha (basados en @coongro/calendar) ---
 
-function todayStr(): string {
-  return toDateString(new Date());
+function todayStr(tz: string): DateKey {
+  return toDateKey(new Date(), tz);
 }
 
-function daysFromNow(n: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + n);
-  return toDateString(d);
+function daysFromNow(n: number, tz: string): DateKey {
+  return addDays(todayStr(tz), n);
 }
 
-function monthStartStr(): string {
-  const d = new Date();
-  return toDateString(getMonthStart(d.getFullYear(), d.getMonth()));
+function monthStartStr(tz: string): string {
+  const now = utcToLocal(new Date(), tz);
+  return toDateString(getMonthStart(now.year, now.month - 1));
 }
 
-function prevMonthRange(): { start: string; end: string } {
-  const d = new Date();
-  const prevMonth = d.getMonth() === 0 ? 11 : d.getMonth() - 1;
-  const prevYear = d.getMonth() === 0 ? d.getFullYear() - 1 : d.getFullYear();
+function prevMonthRange(tz: string): { start: string; end: string } {
+  const now = utcToLocal(new Date(), tz);
+  const prevMonth = now.month === 1 ? 12 : now.month - 1;
+  const prevYear = now.month === 1 ? now.year - 1 : now.year;
   return {
-    start: toDateString(getMonthStart(prevYear, prevMonth)),
-    end: monthStartStr(),
+    start: toDateString(getMonthStart(prevYear, prevMonth - 1)),
+    end: monthStartStr(tz),
   };
 }
 
-function dateKey(iso: string): string {
-  return iso.slice(0, 10);
+/** Día local del tenant para un `UTCTimestamp`. */
+function dateKey(value: UTCTimestamp, tz: string): DateKey {
+  return toDateKey(value, tz);
 }
 
 function formatCurrency(value: number): string {
@@ -103,10 +109,10 @@ function formatCurrency(value: number): string {
   });
 }
 
-function dayLabel(daysAgo: number, dateStr: string): string {
+function dayLabel(daysAgo: number, dateStr: string, tz: string): string {
   if (daysAgo === 0) return 'Hoy';
   if (daysAgo === 1) return 'Ayer';
-  return formatEventDate(dateStr);
+  return formatEventDate(dateStr, tz);
 }
 
 // --- Cómputos ---
@@ -131,20 +137,21 @@ function sumRevenueForIds(consultationIds: Set<string>, services: ConsultationSe
 
 function computeRevenueLast7Days(
   consultations: Consultation[],
-  services: ConsultationService[]
+  services: ConsultationService[],
+  tz: string
 ): Array<{ date: string; label: string; revenue: number }> {
   const consDateMap = new Map<string, string>();
-  for (const c of consultations) consDateMap.set(c.id, dateKey(c.date));
+  for (const c of consultations) consDateMap.set(c.id, dateKey(c.date, tz));
 
   const result: Array<{ date: string; label: string; revenue: number }> = [];
   for (let i = 6; i >= 0; i--) {
-    const day = daysFromNow(-i);
+    const day = daysFromNow(-i, tz);
     const dayConsIds = new Set<string>();
     for (const [id, d] of consDateMap) {
       if (d === day) dayConsIds.add(id);
     }
     const revenue = sumRevenueForIds(dayConsIds, services);
-    result.push({ date: day, label: dayLabel(i, day), revenue });
+    result.push({ date: day, label: dayLabel(i, day, tz), revenue });
   }
   return result;
 }
@@ -176,6 +183,7 @@ function trendFooter(trend: { text: string; color: string }, label: string): Rea
 export function DashboardView(): React.ReactNode {
   const { views } = usePlugin();
   const isMobile = useIsMobile();
+  const tz = useTenantTimezone();
   const [consultations, setConsultations] = useState<Consultation[]>([]);
   const [services, setServices] = useState<ConsultationService[]>([]);
   const [pets, setPets] = useState<Pet[]>([]);
@@ -185,7 +193,7 @@ export function DashboardView(): React.ReactNode {
   const [retryCount, setRetryCount] = useState(0);
 
   const { sections: contributedSections } = useViewContributions('kit-veterinary.dashboard.open', {
-    today: todayStr(),
+    today: todayStr(tz),
   });
 
   // Patrón correcto para React 18 StrictMode: variable local por efecto
@@ -224,7 +232,7 @@ export function DashboardView(): React.ReactNode {
 
   // --- Datos derivados ---
 
-  const today = todayStr();
+  const today = todayStr(tz);
 
   const petMap = useMemo(() => {
     const map = new Map<string, Pet>();
@@ -235,14 +243,14 @@ export function DashboardView(): React.ReactNode {
   const todayConsultations = useMemo(
     () =>
       consultations
-        .filter((c) => dateKey(c.date) === today)
+        .filter((c) => dateKey(c.date, tz) === today)
         .sort((a, b) => a.date.localeCompare(b.date)),
-    [consultations, today]
+    [consultations, today, tz]
   );
 
   const lastWeekSameDayCount = useMemo(
-    () => consultations.filter((c) => dateKey(c.date) === daysFromNow(-7)).length,
-    [consultations]
+    () => consultations.filter((c) => dateKey(c.date, tz) === daysFromNow(-7, tz)).length,
+    [consultations, tz]
   );
 
   const revenueToday = useMemo(() => {
@@ -251,50 +259,51 @@ export function DashboardView(): React.ReactNode {
   }, [todayConsultations, services]);
 
   const revenueYesterday = useMemo(() => {
-    const yesterday = daysFromNow(-1);
+    const yesterday = daysFromNow(-1, tz);
     const ids = new Set(
-      consultations.filter((c) => dateKey(c.date) === yesterday).map((c) => c.id)
+      consultations.filter((c) => dateKey(c.date, tz) === yesterday).map((c) => c.id)
     );
     return sumRevenueForIds(ids, services);
-  }, [consultations, services]);
+  }, [consultations, services, tz]);
 
   const activePatients = useMemo(() => {
-    const yearAgo = daysFromNow(-365);
+    const yearAgo = daysFromNow(-365, tz);
     const ids = new Set(
-      consultations.filter((c) => dateKey(c.date) >= yearAgo).map((c) => c.pet_id)
+      consultations.filter((c) => dateKey(c.date, tz) >= yearAgo).map((c) => c.pet_id)
     );
     return ids.size;
-  }, [consultations]);
+  }, [consultations, tz]);
 
   const newClientsMonth = useMemo(
-    () => contacts.filter((c) => dateKey(c.created_at) >= monthStartStr()).length,
-    [contacts]
+    () => contacts.filter((c) => dateKey(c.created_at, tz) >= monthStartStr(tz)).length,
+    [contacts, tz]
   );
 
   const newClientsLastMonth = useMemo(() => {
-    const { start, end } = prevMonthRange();
+    const { start, end } = prevMonthRange(tz);
     return contacts.filter((c) => {
-      const d = dateKey(c.created_at);
+      const d = dateKey(c.created_at, tz);
       return d >= start && d < end;
     }).length;
-  }, [contacts]);
+  }, [contacts, tz]);
 
   const revenueDays = useMemo(
-    () => computeRevenueLast7Days(consultations, services),
-    [consultations, services]
+    () => computeRevenueLast7Days(consultations, services, tz),
+    [consultations, services, tz]
   );
 
   const topServices = useMemo(() => computeTopServices(services), [services]);
 
   const followUps = useMemo(() => {
-    const twoWeeksAhead = daysFromNow(14);
+    const twoWeeksAhead = daysFromNow(14, tz);
     return consultations
-      .filter(
-        (c) => c.follow_up_date && c.follow_up_date >= today && c.follow_up_date <= twoWeeksAhead
-      )
+      .filter((c) => {
+        if (!c.follow_up_date) return false;
+        return c.follow_up_date >= today && c.follow_up_date <= twoWeeksAhead;
+      })
       .sort((a, b) => (a.follow_up_date ?? '').localeCompare(b.follow_up_date ?? ''))
       .slice(0, 5);
-  }, [consultations, today]);
+  }, [consultations, today, tz]);
 
   // --- Estados de error y carga ---
 
@@ -355,7 +364,7 @@ export function DashboardView(): React.ReactNode {
               textTransform: 'capitalize',
             },
           },
-          formatEventDate(new Date().toISOString())
+          formatEventDate(new Date().toISOString(), tz)
         ),
         h(
           'p',
@@ -433,7 +442,7 @@ export function DashboardView(): React.ReactNode {
           marginBottom: '24px',
         },
       },
-      renderTodayConsultations(todayConsultations, petMap, views, isMobile),
+      renderTodayConsultations(todayConsultations, petMap, views, tz, isMobile),
       renderFollowUps(followUps, petMap, today, views)
     ),
 
@@ -469,6 +478,7 @@ function renderTodayConsultations(
   todayConsultations: Consultation[],
   petMap: Map<string, Pet>,
   views: ReturnType<typeof usePlugin>['views'],
+  tz: string,
   isMobile = false
 ): React.ReactNode {
   return h(
@@ -521,7 +531,7 @@ function renderTodayConsultations(
                         views.open('consultations.detail.open', { consultationId: c.id }),
                       style: { cursor: 'pointer' },
                     },
-                    h(UI.TableCell, null, formatEventTime(c.date)),
+                    h(UI.TableCell, null, formatEventTime(c.date, tz)),
                     h(UI.TableCell, { style: { fontWeight: '500' } }, pet?.name ?? '\u2014'),
                     !isMobile &&
                       h(
@@ -614,7 +624,7 @@ function renderFollowUpItem(
             fontWeight: isToday ? '600' : '400',
           },
         },
-        isToday ? 'HOY' : formatEventDate(c.follow_up_date ?? '')
+        isToday ? 'HOY' : (c.follow_up_date ?? '')
       )
     ),
     c.follow_up_notes
