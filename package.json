@@ -2,7 +2,7 @@
   "name": "@coongro/kit-veterinary",
   "version": "0.2.0",
   "type": "module",
-  "description": "Kit base para gestión veterinaria. Incluye pacientes, consultas, productos y contactos.",
+  "description": "Kit base para gestión veterinaria. Incluye pacientes, consultas, productos, contactos y turnos.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -43,15 +43,18 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "@coongro/appointments": ">=0.1.0",
     "@coongro/calendar": ">=0.1.0",
     "@coongro/consultations": "*",
     "@coongro/patients": "*"
   },
   "peerDependencies": {
+    "@coongro/datetime": ">=0.24.0",
     "@coongro/plugin-sdk": ">=0.13.0"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.0",
+    "@coongro/datetime": ">=0.24.0",
     "@coongro/plugin-sdk": ">=0.14.0",
     "@fortawesome/fontawesome-free": "^6.5.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
