@@ -45,8 +45,9 @@
   "dependencies": {
     "@coongro/appointments": ">=0.1.0",
     "@coongro/calendar": ">=0.1.0",
-    "@coongro/consultations": "*",
-    "@coongro/patients": "*"
+    "@coongro/consultations": ">=0.1.0",
+    "@coongro/patients": ">=1.0.0",
+    "@coongro/vet-staff": ">=0.1.0"
   },
   "peerDependencies": {
     "@coongro/datetime": ">=0.24.0",
