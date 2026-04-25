@@ -9,3 +9,22 @@
     grid-template-columns: 1fr !important;
   }
 }
+
+/* Scrollbar visible persistente para listas scrolleables del dashboard */
+.cg-scrollable {
+  scrollbar-width: thin;
+  scrollbar-color: var(--cg-border) transparent;
+}
+.cg-scrollable::-webkit-scrollbar {
+  width: 8px;
+}
+.cg-scrollable::-webkit-scrollbar-track {
+  background: transparent;
+}
+.cg-scrollable::-webkit-scrollbar-thumb {
+  background-color: var(--cg-border);
+  border-radius: 4px;
+}
+.cg-scrollable::-webkit-scrollbar-thumb:hover {
+  background-color: var(--cg-text-muted);
+}

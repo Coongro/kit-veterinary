@@ -1,4 +1,14 @@
 import {
+  type Appointment,
+  useTodayAppointments,
+  toCalendarEvents,
+  buildAppointmentMap,
+  STATUS_LABELS,
+  STATUS_BADGE_STYLES,
+  STATUS_DOT_STYLES,
+} from '@coongro/appointments';
+import {
+  EventCard,
   toDateString,
   formatEventDate,
   formatEventTime,
@@ -42,8 +52,6 @@ interface Consultation {
   reason: string;
   reason_category?: string;
   diagnosis?: string;
-  follow_up_date?: DateKey | null;
-  follow_up_notes?: string;
   created_at: UTCTimestamp;
 }
 
@@ -191,6 +199,7 @@ export function DashboardView(): React.ReactNode {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const { data: todayAppointments, loading: appointmentsLoading } = useTodayAppointments();
 
   const { sections: contributedSections } = useViewContributions('kit-veterinary.dashboard.open', {
     today: todayStr(tz),
@@ -294,16 +303,13 @@ export function DashboardView(): React.ReactNode {
 
   const topServices = useMemo(() => computeTopServices(services), [services]);
 
-  const followUps = useMemo(() => {
-    const twoWeeksAhead = daysFromNow(14, tz);
-    return consultations
-      .filter((c) => {
-        if (!c.follow_up_date) return false;
-        return c.follow_up_date >= today && c.follow_up_date <= twoWeeksAhead;
-      })
-      .sort((a, b) => (a.follow_up_date ?? '').localeCompare(b.follow_up_date ?? ''))
-      .slice(0, 5);
-  }, [consultations, today, tz]);
+  const pendingAppointments = useMemo(
+    () =>
+      todayAppointments
+        .filter((a) => a.status === 'scheduled')
+        .sort((a, b) => (a.event_start_at ?? '').localeCompare(b.event_start_at ?? '')),
+    [todayAppointments]
+  );
 
   // --- Estados de error y carga ---
 
@@ -375,9 +381,9 @@ export function DashboardView(): React.ReactNode {
               parts.push(
                 `${todayConsultations.length} consulta${todayConsultations.length > 1 ? 's' : ''} hoy`
               );
-            if (followUps.length > 0)
+            if (pendingAppointments.length > 0)
               parts.push(
-                `${followUps.length} seguimiento${followUps.length > 1 ? 's' : ''} pendiente${followUps.length > 1 ? 's' : ''}`
+                `${pendingAppointments.length} turno${pendingAppointments.length > 1 ? 's' : ''} pendiente${pendingAppointments.length > 1 ? 's' : ''}`
               );
             return parts.join(' · ') || 'Sin actividad por el momento';
           })()
@@ -443,7 +449,7 @@ export function DashboardView(): React.ReactNode {
         },
       },
       renderTodayConsultations(todayConsultations, petMap, views, tz, isMobile),
-      renderFollowUps(followUps, petMap, today, views)
+      renderTodayAppointments(todayAppointments, appointmentsLoading, views)
     ),
 
     // Gráficos: Ingresos 7 días + Servicios Top
@@ -553,96 +559,104 @@ function renderTodayConsultations(
   );
 }
 
-function renderFollowUps(
-  followUps: Consultation[],
-  petMap: Map<string, Pet>,
-  today: string,
-  views: ReturnType<typeof usePlugin>['views']
-): React.ReactNode {
+function renderStatusBadge(status: Appointment['status']): React.ReactNode {
   return h(
-    UI.Card,
-    null,
-    h(UI.CardHeader, null, h(UI.CardTitle, null, 'Seguimientos Pendientes')),
-    h(
-      UI.CardBody,
-      null,
-      followUps.length === 0
-        ? h(UI.EmptyState, { title: 'Sin seguimientos próximos' })
-        : h(
-            'div',
-            { className: 'flex flex-col gap-2' },
-            ...followUps.map((c) => renderFollowUpItem(c, petMap, today, views))
-          )
-    )
+    'span',
+    {
+      style: {
+        fontSize: '11px',
+        fontWeight: 600,
+        padding: '2px 8px',
+        borderRadius: '10px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px',
+        flexShrink: 0,
+        ...STATUS_BADGE_STYLES[status],
+      },
+    },
+    h('span', {
+      style: {
+        display: 'inline-block',
+        width: '6px',
+        height: '6px',
+        borderRadius: '50%',
+        ...STATUS_DOT_STYLES[status],
+      },
+    }),
+    STATUS_LABELS[status]
   );
 }
 
-function renderFollowUpItem(
-  c: Consultation,
-  petMap: Map<string, Pet>,
-  today: string,
+function renderTodayAppointments(
+  appointments: Appointment[],
+  loading: boolean,
   views: ReturnType<typeof usePlugin>['views']
 ): React.ReactNode {
-  const pet = petMap.get(c.pet_id);
-  const isToday = c.follow_up_date === today;
+  // Pendientes primero (por hora asc), luego el resto (por hora asc).
+  const sorted = [...appointments].sort((a, b) => {
+    const aPending = a.status === 'scheduled' ? 0 : 1;
+    const bPending = b.status === 'scheduled' ? 0 : 1;
+    if (aPending !== bPending) return aPending - bPending;
+    return (a.event_start_at ?? '').localeCompare(b.event_start_at ?? '');
+  });
+  const apptMap = buildAppointmentMap(sorted);
+  const events = toCalendarEvents(sorted);
+  const openAgenda = () => views.open('appointments.agenda.open');
 
   return h(
-    'div',
-    {
-      key: c.id,
-      onClick: () => views.open('consultations.detail.open', { consultationId: c.id }),
-      style: {
-        padding: '10px 12px',
-        borderRadius: '8px',
-        border: isToday
-          ? '1px solid var(--cg-warning-border, #f59e0b)'
-          : '1px solid var(--cg-border)',
-        backgroundColor: isToday ? 'var(--cg-warning-bg, rgba(245,158,11,0.08))' : 'var(--cg-bg)',
-        cursor: 'pointer',
-      },
-    },
+    UI.Card,
+    null,
+    h(UI.CardHeader, null, h(UI.CardTitle, null, 'Agenda de Hoy')),
     h(
-      'div',
-      {
-        style: {
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        },
-      },
-      h(
-        'span',
-        { style: { fontWeight: '500', fontSize: '13px', color: 'var(--cg-text)' } },
-        pet?.name ?? 'Paciente'
-      ),
-      h(
-        'span',
-        {
-          style: {
-            fontSize: '12px',
-            color: isToday ? 'var(--cg-warning-text, #b45309)' : 'var(--cg-text-muted)',
-            fontWeight: isToday ? '600' : '400',
-          },
-        },
-        isToday ? 'HOY' : (c.follow_up_date ?? '')
-      )
-    ),
-    c.follow_up_notes
-      ? h(
-          'p',
-          {
-            style: {
-              fontSize: '12px',
-              color: 'var(--cg-text-muted)',
-              marginTop: '4px',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap' as const,
-            },
-          },
-          c.follow_up_notes
-        )
-      : null
+      UI.CardBody,
+      null,
+      loading
+        ? h(UI.EmptyState, { title: 'Cargando turnos…' })
+        : events.length === 0
+          ? h(UI.EmptyState, {
+              icon: h(UI.DynamicIcon, {
+                icon: 'CalendarClock',
+                size: 24,
+                className: 'text-cg-text-muted',
+              }),
+              title: 'Sin turnos hoy',
+              description: 'Los turnos agendados para hoy aparecerán aquí.',
+              action: h(UI.Button, {
+                variant: 'outline',
+                onClick: openAgenda,
+                children: 'Ver agenda',
+              }),
+            })
+          : h(
+              'div',
+              {
+                className: 'cg-scrollable',
+                style: {
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px',
+                  maxHeight: '198px', // ~3 items visibles
+                  overflowY: 'scroll' as const, // siempre muestra el track
+                  scrollbarGutter: 'stable' as const,
+                  paddingRight: '4px',
+                },
+              },
+              ...events.map((evt) => {
+                const appt = apptMap.get(evt.id);
+                const status = appt?.status ?? 'scheduled';
+                return h(EventCard, {
+                  key: evt.id,
+                  event: evt,
+                  variant: 'list',
+                  showTime: true,
+                  badge: renderStatusBadge(status),
+                  subtitle: appt?.reason ?? null,
+                  onClick: openAgenda,
+                });
+              })
+            )
+    )
   );
 }
 
