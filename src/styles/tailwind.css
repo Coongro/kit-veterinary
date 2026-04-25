@@ -1,3 +1,30 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Dashboard: stackear grids en mobile */
+@media (max-width: 767px) {
+  .grid[style*="gridTemplateColumns"],
+  .grid[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Scrollbar visible persistente para listas scrolleables del dashboard */
+.cg-scrollable {
+  scrollbar-width: thin;
+  scrollbar-color: var(--cg-border) transparent;
+}
+.cg-scrollable::-webkit-scrollbar {
+  width: 8px;
+}
+.cg-scrollable::-webkit-scrollbar-track {
+  background: transparent;
+}
+.cg-scrollable::-webkit-scrollbar-thumb {
+  background-color: var(--cg-border);
+  border-radius: 4px;
+}
+.cg-scrollable::-webkit-scrollbar-thumb:hover {
+  background-color: var(--cg-text-muted);
+}

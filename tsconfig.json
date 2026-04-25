@@ -34,11 +34,20 @@
       "@coongro/ui-components": [
         "../../packages/ui-components/dist/index.d.ts"
       ],
+      "@coongro/appointments": [
+        "../appointments/dist/index.d.ts"
+      ],
+      "@coongro/calendar": [
+        "../calendar/dist/index.d.ts"
+      ],
       "@coongro/consultations": [
         "../consultations/dist/index.d.ts"
       ],
       "@coongro/patients": [
         "../patients/dist/index.d.ts"
+      ],
+      "@coongro/datetime": [
+        "../../packages/datetime/dist/index.d.ts"
       ]
     }
   },

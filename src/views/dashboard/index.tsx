@@ -1,4 +1,22 @@
+import {
+  type Appointment,
+  useTodayAppointments,
+  toCalendarEvents,
+  buildAppointmentMap,
+  STATUS_LABELS,
+  STATUS_BADGE_STYLES,
+  STATUS_DOT_STYLES,
+} from '@coongro/appointments';
+import {
+  EventCard,
+  toDateString,
+  formatEventDate,
+  formatEventTime,
+  getMonthStart,
+  useTenantTimezone,
+} from '@coongro/calendar';
 import { CreateConsultationButton } from '@coongro/consultations';
+import { addDays, toDateKey, utcToLocal, type DateKey, type UTCTimestamp } from '@coongro/datetime';
 import { CreatePetButton } from '@coongro/patients';
 import {
   getHostReact,
@@ -13,19 +31,28 @@ const UI = getHostUI();
 const { useState, useEffect, useMemo } = React;
 const h = React.createElement;
 
+/** Hook para detectar si el viewport es mobile (<768px) */
+function useIsMobile(breakpoint = 768): boolean {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < breakpoint);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < breakpoint);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, [breakpoint]);
+  return isMobile;
+}
+
 // --- Tipos ---
 
 interface Consultation {
   id: string;
   pet_id: string;
   vet_name: string;
-  date: string;
+  date: UTCTimestamp;
   reason: string;
   reason_category?: string;
   diagnosis?: string;
-  follow_up_date?: string;
-  follow_up_notes?: string;
-  created_at: string;
+  created_at: UTCTimestamp;
 }
 
 interface ConsultationService {
@@ -35,7 +62,7 @@ interface ConsultationService {
   quantity: string;
   unit_price: string;
   subtotal: string;
-  created_at: string;
+  created_at: UTCTimestamp;
 }
 
 interface Pet {
@@ -48,47 +75,37 @@ interface Pet {
 interface Contact {
   id: string;
   name: string;
-  created_at: string;
+  created_at: UTCTimestamp;
 }
 
-// --- Helpers de fecha ---
+// --- Helpers de fecha (basados en @coongro/calendar) ---
 
-function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+function todayStr(tz: string): DateKey {
+  return toDateKey(new Date(), tz);
 }
 
-function daysFromNow(n: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
+function daysFromNow(n: number, tz: string): DateKey {
+  return addDays(todayStr(tz), n);
 }
 
-function monthStartStr(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+function monthStartStr(tz: string): string {
+  const now = utcToLocal(new Date(), tz);
+  return toDateString(getMonthStart(now.year, now.month - 1));
 }
 
-function prevMonthRange(): { start: string; end: string } {
-  const d = new Date();
-  d.setMonth(d.getMonth() - 1);
-  const start = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
-  return { start, end: monthStartStr() };
+function prevMonthRange(tz: string): { start: string; end: string } {
+  const now = utcToLocal(new Date(), tz);
+  const prevMonth = now.month === 1 ? 12 : now.month - 1;
+  const prevYear = now.month === 1 ? now.year - 1 : now.year;
+  return {
+    start: toDateString(getMonthStart(prevYear, prevMonth - 1)),
+    end: monthStartStr(tz),
+  };
 }
 
-function dateKey(iso: string): string {
-  return iso.slice(0, 10);
-}
-
-function formatDateShort(iso: string): string {
-  return new Date(iso).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
-}
-
-function formatDateLong(iso: string): string {
-  return new Date(iso).toLocaleDateString('es-AR', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  });
+/** Día local del tenant para un `UTCTimestamp`. */
+function dateKey(value: UTCTimestamp, tz: string): DateKey {
+  return toDateKey(value, tz);
 }
 
 function formatCurrency(value: number): string {
@@ -100,10 +117,10 @@ function formatCurrency(value: number): string {
   });
 }
 
-function dayLabel(daysAgo: number, dateStr: string): string {
+function dayLabel(daysAgo: number, dateStr: string, tz: string): string {
   if (daysAgo === 0) return 'Hoy';
   if (daysAgo === 1) return 'Ayer';
-  return formatDateShort(dateStr);
+  return formatEventDate(dateStr, tz);
 }
 
 // --- Cómputos ---
@@ -128,20 +145,21 @@ function sumRevenueForIds(consultationIds: Set<string>, services: ConsultationSe
 
 function computeRevenueLast7Days(
   consultations: Consultation[],
-  services: ConsultationService[]
+  services: ConsultationService[],
+  tz: string
 ): Array<{ date: string; label: string; revenue: number }> {
   const consDateMap = new Map<string, string>();
-  for (const c of consultations) consDateMap.set(c.id, dateKey(c.date));
+  for (const c of consultations) consDateMap.set(c.id, dateKey(c.date, tz));
 
   const result: Array<{ date: string; label: string; revenue: number }> = [];
   for (let i = 6; i >= 0; i--) {
-    const day = daysFromNow(-i);
+    const day = daysFromNow(-i, tz);
     const dayConsIds = new Set<string>();
     for (const [id, d] of consDateMap) {
       if (d === day) dayConsIds.add(id);
     }
     const revenue = sumRevenueForIds(dayConsIds, services);
-    result.push({ date: day, label: dayLabel(i, day), revenue });
+    result.push({ date: day, label: dayLabel(i, day, tz), revenue });
   }
   return result;
 }
@@ -172,6 +190,8 @@ function trendFooter(trend: { text: string; color: string }, label: string): Rea
 
 export function DashboardView(): React.ReactNode {
   const { views } = usePlugin();
+  const isMobile = useIsMobile();
+  const tz = useTenantTimezone();
   const [consultations, setConsultations] = useState<Consultation[]>([]);
   const [services, setServices] = useState<ConsultationService[]>([]);
   const [pets, setPets] = useState<Pet[]>([]);
@@ -179,9 +199,10 @@ export function DashboardView(): React.ReactNode {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const { data: todayAppointments, loading: appointmentsLoading } = useTodayAppointments();
 
   const { sections: contributedSections } = useViewContributions('kit-veterinary.dashboard.open', {
-    today: todayStr(),
+    today: todayStr(tz),
   });
 
   // Patrón correcto para React 18 StrictMode: variable local por efecto
@@ -220,7 +241,7 @@ export function DashboardView(): React.ReactNode {
 
   // --- Datos derivados ---
 
-  const today = todayStr();
+  const today = todayStr(tz);
 
   const petMap = useMemo(() => {
     const map = new Map<string, Pet>();
@@ -231,14 +252,14 @@ export function DashboardView(): React.ReactNode {
   const todayConsultations = useMemo(
     () =>
       consultations
-        .filter((c) => dateKey(c.date) === today)
+        .filter((c) => dateKey(c.date, tz) === today)
         .sort((a, b) => a.date.localeCompare(b.date)),
-    [consultations, today]
+    [consultations, today, tz]
   );
 
   const lastWeekSameDayCount = useMemo(
-    () => consultations.filter((c) => dateKey(c.date) === daysFromNow(-7)).length,
-    [consultations]
+    () => consultations.filter((c) => dateKey(c.date, tz) === daysFromNow(-7, tz)).length,
+    [consultations, tz]
   );
 
   const revenueToday = useMemo(() => {
@@ -247,50 +268,48 @@ export function DashboardView(): React.ReactNode {
   }, [todayConsultations, services]);
 
   const revenueYesterday = useMemo(() => {
-    const yesterday = daysFromNow(-1);
+    const yesterday = daysFromNow(-1, tz);
     const ids = new Set(
-      consultations.filter((c) => dateKey(c.date) === yesterday).map((c) => c.id)
+      consultations.filter((c) => dateKey(c.date, tz) === yesterday).map((c) => c.id)
     );
     return sumRevenueForIds(ids, services);
-  }, [consultations, services]);
+  }, [consultations, services, tz]);
 
   const activePatients = useMemo(() => {
-    const yearAgo = daysFromNow(-365);
+    const yearAgo = daysFromNow(-365, tz);
     const ids = new Set(
-      consultations.filter((c) => dateKey(c.date) >= yearAgo).map((c) => c.pet_id)
+      consultations.filter((c) => dateKey(c.date, tz) >= yearAgo).map((c) => c.pet_id)
     );
     return ids.size;
-  }, [consultations]);
+  }, [consultations, tz]);
 
   const newClientsMonth = useMemo(
-    () => contacts.filter((c) => dateKey(c.created_at) >= monthStartStr()).length,
-    [contacts]
+    () => contacts.filter((c) => dateKey(c.created_at, tz) >= monthStartStr(tz)).length,
+    [contacts, tz]
   );
 
   const newClientsLastMonth = useMemo(() => {
-    const { start, end } = prevMonthRange();
+    const { start, end } = prevMonthRange(tz);
     return contacts.filter((c) => {
-      const d = dateKey(c.created_at);
+      const d = dateKey(c.created_at, tz);
       return d >= start && d < end;
     }).length;
-  }, [contacts]);
+  }, [contacts, tz]);
 
   const revenueDays = useMemo(
-    () => computeRevenueLast7Days(consultations, services),
-    [consultations, services]
+    () => computeRevenueLast7Days(consultations, services, tz),
+    [consultations, services, tz]
   );
 
   const topServices = useMemo(() => computeTopServices(services), [services]);
 
-  const followUps = useMemo(() => {
-    const twoWeeksAhead = daysFromNow(14);
-    return consultations
-      .filter(
-        (c) => c.follow_up_date && c.follow_up_date >= today && c.follow_up_date <= twoWeeksAhead
-      )
-      .sort((a, b) => (a.follow_up_date ?? '').localeCompare(b.follow_up_date ?? ''))
-      .slice(0, 5);
-  }, [consultations, today]);
+  const pendingAppointments = useMemo(
+    () =>
+      todayAppointments
+        .filter((a) => a.status === 'scheduled')
+        .sort((a, b) => (a.event_start_at ?? '').localeCompare(b.event_start_at ?? '')),
+    [todayAppointments]
+  );
 
   // --- Estados de error y carga ---
 
@@ -318,10 +337,9 @@ export function DashboardView(): React.ReactNode {
     'div',
     {
       style: {
-        padding: '24px',
+        padding: isMobile ? '16px' : '24px',
         minHeight: '100vh',
         backgroundColor: 'var(--cg-bg-secondary)',
-        fontFamily: 'var(--cg-font-sans, Inter, system-ui, sans-serif)',
       },
     },
 
@@ -331,9 +349,11 @@ export function DashboardView(): React.ReactNode {
       {
         style: {
           display: 'flex',
-          alignItems: 'center',
+          flexDirection: isMobile ? 'column' : 'row',
+          alignItems: isMobile ? 'flex-start' : 'center',
           justifyContent: 'space-between',
           marginBottom: '24px',
+          gap: '16px',
         },
       },
       h(
@@ -341,18 +361,37 @@ export function DashboardView(): React.ReactNode {
         null,
         h(
           'h1',
-          { style: { fontSize: '24px', fontWeight: '700', color: 'var(--cg-text)', margin: 0 } },
-          'Dashboard'
+          {
+            style: {
+              fontSize: isMobile ? '18px' : '22px',
+              fontWeight: '700',
+              color: 'var(--cg-text)',
+              margin: 0,
+              textTransform: 'capitalize',
+            },
+          },
+          formatEventDate(new Date().toISOString(), tz)
         ),
         h(
           'p',
           { style: { fontSize: '13px', color: 'var(--cg-text-muted)', marginTop: '2px' } },
-          formatDateLong(new Date().toISOString())
+          (() => {
+            const parts: string[] = [];
+            if (todayConsultations.length > 0)
+              parts.push(
+                `${todayConsultations.length} consulta${todayConsultations.length > 1 ? 's' : ''} hoy`
+              );
+            if (pendingAppointments.length > 0)
+              parts.push(
+                `${pendingAppointments.length} turno${pendingAppointments.length > 1 ? 's' : ''} pendiente${pendingAppointments.length > 1 ? 's' : ''}`
+              );
+            return parts.join(' · ') || 'Sin actividad por el momento';
+          })()
         )
       ),
       h(
         'div',
-        { style: { display: 'flex', gap: '8px' } },
+        { style: { display: 'flex', gap: '8px', flexShrink: 0 } },
         h(CreateConsultationButton, {
           label: 'Nueva Consulta',
           onSuccess: (c) => views.open('consultations.detail.open', { consultationId: c.id }),
@@ -404,13 +443,13 @@ export function DashboardView(): React.ReactNode {
       {
         style: {
           display: 'grid',
-          gridTemplateColumns: '2fr 1fr',
+          gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 2fr) minmax(0, 1fr)',
           gap: '16px',
           marginBottom: '24px',
         },
       },
-      renderTodayConsultations(todayConsultations, petMap, views),
-      renderFollowUps(followUps, petMap, today, views)
+      renderTodayConsultations(todayConsultations, petMap, views, tz, isMobile),
+      renderTodayAppointments(todayAppointments, appointmentsLoading, views)
     ),
 
     // Gráficos: Ingresos 7 días + Servicios Top
@@ -419,7 +458,7 @@ export function DashboardView(): React.ReactNode {
       {
         style: {
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
+          gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) minmax(0, 1fr)',
           gap: '16px',
           marginBottom: '24px',
         },
@@ -444,7 +483,9 @@ export function DashboardView(): React.ReactNode {
 function renderTodayConsultations(
   todayConsultations: Consultation[],
   petMap: Map<string, Pet>,
-  views: ReturnType<typeof usePlugin>['views']
+  views: ReturnType<typeof usePlugin>['views'],
+  tz: string,
+  isMobile = false
 ): React.ReactNode {
   return h(
     UI.Card,
@@ -454,150 +495,168 @@ function renderTodayConsultations(
       UI.CardBody,
       null,
       todayConsultations.length === 0
-        ? h(UI.EmptyState, { title: 'Sin consultas hoy' })
+        ? h(UI.EmptyState, {
+            icon: h(UI.DynamicIcon, {
+              icon: 'CalendarX2',
+              size: 24,
+              className: 'text-cg-text-muted',
+            }),
+            title: 'Sin consultas por ahora',
+            description: 'Las consultas agendadas para hoy aparecerán aquí.',
+            action: h(CreateConsultationButton, { label: 'Registrar consulta' }),
+          })
         : h(
-            UI.Table,
-            null,
+            'div',
+            { style: { overflowX: 'auto' } },
             h(
-              UI.TableHeader,
+              UI.Table,
               null,
               h(
-                UI.TableRow,
+                UI.TableHeader,
                 null,
-                h(UI.TableHead, null, 'Hora'),
-                h(UI.TableHead, null, 'Paciente'),
-                h(UI.TableHead, null, 'Especie'),
-                h(UI.TableHead, null, 'Motivo'),
-                h(UI.TableHead, null, 'Veterinario')
-              )
-            ),
-            h(
-              UI.TableBody,
-              null,
-              ...todayConsultations.map((c) => {
-                const pet = petMap.get(c.pet_id);
-                return h(
+                h(
                   UI.TableRow,
-                  {
-                    key: c.id,
-                    onClick: () =>
-                      views.open('consultations.detail.open', { consultationId: c.id }),
-                    style: { cursor: 'pointer' },
-                  },
-                  h(
-                    UI.TableCell,
-                    null,
-                    new Date(c.date).toLocaleTimeString('es-AR', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })
-                  ),
-                  h(UI.TableCell, { style: { fontWeight: '500' } }, pet?.name ?? '\u2014'),
-                  h(
-                    UI.TableCell,
-                    null,
-                    pet ? h(UI.Badge, { variant: 'secondary', size: 'sm' }, pet.species) : '\u2014'
-                  ),
-                  h(UI.TableCell, null, c.reason),
-                  h(UI.TableCell, { style: { color: 'var(--cg-text-muted)' } }, c.vet_name)
-                );
-              })
+                  null,
+                  h(UI.TableHead, null, 'Hora'),
+                  h(UI.TableHead, null, 'Paciente'),
+                  !isMobile && h(UI.TableHead, null, 'Especie'),
+                  h(UI.TableHead, null, 'Motivo'),
+                  !isMobile && h(UI.TableHead, null, 'Veterinario')
+                )
+              ),
+              h(
+                UI.TableBody,
+                null,
+                ...todayConsultations.map((c) => {
+                  const pet = petMap.get(c.pet_id);
+                  return h(
+                    UI.TableRow,
+                    {
+                      key: c.id,
+                      onClick: () =>
+                        views.open('consultations.detail.open', { consultationId: c.id }),
+                      style: { cursor: 'pointer' },
+                    },
+                    h(UI.TableCell, null, formatEventTime(c.date, tz)),
+                    h(UI.TableCell, { style: { fontWeight: '500' } }, pet?.name ?? '\u2014'),
+                    !isMobile &&
+                      h(
+                        UI.TableCell,
+                        null,
+                        pet
+                          ? h(UI.Badge, { variant: 'secondary', size: 'sm' }, pet.species)
+                          : '\u2014'
+                      ),
+                    h(UI.TableCell, null, c.reason),
+                    !isMobile &&
+                      h(UI.TableCell, { style: { color: 'var(--cg-text-muted)' } }, c.vet_name)
+                  );
+                })
+              )
             )
           )
     )
   );
 }
 
-function renderFollowUps(
-  followUps: Consultation[],
-  petMap: Map<string, Pet>,
-  today: string,
-  views: ReturnType<typeof usePlugin>['views']
-): React.ReactNode {
+function renderStatusBadge(status: Appointment['status']): React.ReactNode {
   return h(
-    UI.Card,
-    null,
-    h(UI.CardHeader, null, h(UI.CardTitle, null, 'Seguimientos Pendientes')),
-    h(
-      UI.CardBody,
-      null,
-      followUps.length === 0
-        ? h(UI.EmptyState, { title: 'Sin seguimientos próximos' })
-        : h(
-            'div',
-            { className: 'flex flex-col gap-2' },
-            ...followUps.map((c) => renderFollowUpItem(c, petMap, today, views))
-          )
-    )
+    'span',
+    {
+      style: {
+        fontSize: '11px',
+        fontWeight: 600,
+        padding: '2px 8px',
+        borderRadius: '10px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px',
+        flexShrink: 0,
+        ...STATUS_BADGE_STYLES[status],
+      },
+    },
+    h('span', {
+      style: {
+        display: 'inline-block',
+        width: '6px',
+        height: '6px',
+        borderRadius: '50%',
+        ...STATUS_DOT_STYLES[status],
+      },
+    }),
+    STATUS_LABELS[status]
   );
 }
 
-function renderFollowUpItem(
-  c: Consultation,
-  petMap: Map<string, Pet>,
-  today: string,
+function renderTodayAppointments(
+  appointments: Appointment[],
+  loading: boolean,
   views: ReturnType<typeof usePlugin>['views']
 ): React.ReactNode {
-  const pet = petMap.get(c.pet_id);
-  const isToday = c.follow_up_date === today;
+  // Pendientes primero (por hora asc), luego el resto (por hora asc).
+  const sorted = [...appointments].sort((a, b) => {
+    const aPending = a.status === 'scheduled' ? 0 : 1;
+    const bPending = b.status === 'scheduled' ? 0 : 1;
+    if (aPending !== bPending) return aPending - bPending;
+    return (a.event_start_at ?? '').localeCompare(b.event_start_at ?? '');
+  });
+  const apptMap = buildAppointmentMap(sorted);
+  const events = toCalendarEvents(sorted);
+  const openAgenda = () => views.open('appointments.agenda.open');
 
   return h(
-    'div',
-    {
-      key: c.id,
-      onClick: () => views.open('consultations.detail.open', { consultationId: c.id }),
-      style: {
-        padding: '10px 12px',
-        borderRadius: '8px',
-        border: isToday
-          ? '1px solid var(--cg-warning-border, #f59e0b)'
-          : '1px solid var(--cg-border)',
-        backgroundColor: isToday ? 'var(--cg-warning-bg, rgba(245,158,11,0.08))' : 'var(--cg-bg)',
-        cursor: 'pointer',
-      },
-    },
+    UI.Card,
+    null,
+    h(UI.CardHeader, null, h(UI.CardTitle, null, 'Agenda de Hoy')),
     h(
-      'div',
-      {
-        style: {
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        },
-      },
-      h(
-        'span',
-        { style: { fontWeight: '500', fontSize: '13px', color: 'var(--cg-text)' } },
-        pet?.name ?? 'Paciente'
-      ),
-      h(
-        'span',
-        {
-          style: {
-            fontSize: '12px',
-            color: isToday ? 'var(--cg-warning-text, #b45309)' : 'var(--cg-text-muted)',
-            fontWeight: isToday ? '600' : '400',
-          },
-        },
-        isToday ? 'HOY' : formatDateShort(c.follow_up_date ?? '')
-      )
-    ),
-    c.follow_up_notes
-      ? h(
-          'p',
-          {
-            style: {
-              fontSize: '12px',
-              color: 'var(--cg-text-muted)',
-              marginTop: '4px',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap' as const,
-            },
-          },
-          c.follow_up_notes
-        )
-      : null
+      UI.CardBody,
+      null,
+      loading
+        ? h(UI.EmptyState, { title: 'Cargando turnos…' })
+        : events.length === 0
+          ? h(UI.EmptyState, {
+              icon: h(UI.DynamicIcon, {
+                icon: 'CalendarClock',
+                size: 24,
+                className: 'text-cg-text-muted',
+              }),
+              title: 'Sin turnos hoy',
+              description: 'Los turnos agendados para hoy aparecerán aquí.',
+              action: h(UI.Button, {
+                variant: 'outline',
+                onClick: openAgenda,
+                children: 'Ver agenda',
+              }),
+            })
+          : h(
+              'div',
+              {
+                className: 'cg-scrollable',
+                style: {
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px',
+                  maxHeight: '198px', // ~3 items visibles
+                  overflowY: 'scroll' as const, // siempre muestra el track
+                  scrollbarGutter: 'stable' as const,
+                  paddingRight: '4px',
+                },
+              },
+              ...events.map((evt) => {
+                const appt = apptMap.get(evt.id);
+                const status = appt?.status ?? 'scheduled';
+                return h(EventCard, {
+                  key: evt.id,
+                  event: evt,
+                  variant: 'list',
+                  showTime: true,
+                  badge: renderStatusBadge(status),
+                  subtitle: appt?.reason ?? null,
+                  onClick: openAgenda,
+                });
+              })
+            )
+    )
   );
 }
 
