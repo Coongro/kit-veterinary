@@ -1,6 +1,6 @@
 {
   "id": "kit-veterinary",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "apiVersion": "2.0",
   "initView": "kit-veterinary.dashboard.open",
   "assets": {
