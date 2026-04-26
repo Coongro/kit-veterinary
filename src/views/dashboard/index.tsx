@@ -398,7 +398,6 @@ export function DashboardView(): React.ReactNode {
         }),
         h(CreatePetButton, {
           label: 'Registrar Paciente',
-          variant: 'outline',
           onSuccess: (pet) => views.open('patients.detail.open', { petId: pet.id }),
         })
       )
@@ -680,7 +679,9 @@ function renderRevenueChart(
             { key: d.date, className: 'flex items-center gap-2' },
             h(
               'span',
-              { className: 'w-12 shrink-0 text-right text-xs text-cg-text-muted' },
+              {
+                className: 'w-20 shrink-0 text-right text-xs text-cg-text-muted whitespace-nowrap',
+              },
               d.label
             ),
             h(UI.ProgressBar, {
