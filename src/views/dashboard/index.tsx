@@ -78,6 +78,24 @@ interface Contact {
   created_at: UTCTimestamp;
 }
 
+/** Cuenta de cobro (billing) con su total derivado. `opened_at` = fecha de negocio (ISO). */
+interface BillingAccount {
+  total: string;
+  opened_at: string;
+  status: string;
+  source: string;
+}
+
+/** Línea de cobro (billing) con la fecha/origen de su cuenta, para agregados por período. */
+interface BillingLine {
+  description: string;
+  quantity: string;
+  subtotal: string;
+  source_type: string;
+  account_source: string;
+  opened_at: string;
+}
+
 // --- Helpers de fecha (basados en @coongro/calendar) ---
 
 function todayStr(tz: string): DateKey {
@@ -180,6 +198,37 @@ function computeTopServices(
     .slice(0, 5);
 }
 
+// --- Cómputos desde billing (cuando el módulo de cobros está instalado) ---
+// El KPI de ingresos pasa a salir de las CUENTAS de cobro: incluye consultas Y ventas de
+// mostrador (vacunas sueltas), que antes eran invisibles al sumar solo consultation_services.
+
+/** Ingresos por día local del tenant, a partir de las cuentas de billing (clave = opened_at). */
+function billingRevenueByDay(accounts: BillingAccount[], tz: string): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const a of accounts) {
+    const key = dateKey(a.opened_at as UTCTimestamp, tz);
+    map.set(key, (map.get(key) ?? 0) + Number(a.total || 0));
+  }
+  return map;
+}
+
+/** Ítems más cobrados (servicios + vacunas + productos) a partir de las líneas de billing. */
+function computeTopItemsFromBilling(
+  lines: BillingLine[]
+): Array<{ name: string; count: number; revenue: number }> {
+  const map = new Map<string, { count: number; revenue: number }>();
+  for (const l of lines) {
+    const cur = map.get(l.description) ?? { count: 0, revenue: 0 };
+    cur.count += Number(l.quantity || 1);
+    cur.revenue += Number(l.subtotal || 0);
+    map.set(l.description, cur);
+  }
+  return Array.from(map.entries())
+    .map(([name, data]) => ({ name, ...data }))
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 5);
+}
+
 // --- Helpers de render ---
 
 function trendFooter(trend: { text: string; color: string }, label: string): React.ReactNode {
@@ -196,6 +245,9 @@ export function DashboardView(): React.ReactNode {
   const [services, setServices] = useState<ConsultationService[]>([]);
   const [pets, setPets] = useState<Pet[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [billingAccounts, setBillingAccounts] = useState<BillingAccount[]>([]);
+  const [billingLines, setBillingLines] = useState<BillingLine[]>([]);
+  const [billingOn, setBillingOn] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -224,6 +276,21 @@ export function DashboardView(): React.ReactNode {
           setServices(Array.isArray(svcs) ? svcs : []);
           setPets(Array.isArray(petList) ? petList : []);
           setContacts(Array.isArray(contactList) ? contactList : []);
+        }
+        // Cobros (billing): fuente de ingresos si el plugin está instalado. Dependencia
+        // blanda — si no está, el dashboard sigue calculando desde consultation_services.
+        try {
+          const [accts, lines] = await Promise.all([
+            actions.execute<BillingAccount[]>('billing.accounts.listWithTotals'),
+            actions.execute<BillingLine[]>('billing.lines.listInRange'),
+          ]);
+          if (!cancelled) {
+            setBillingAccounts(Array.isArray(accts) ? accts : []);
+            setBillingLines(Array.isArray(lines) ? lines : []);
+            setBillingOn(true);
+          }
+        } catch {
+          if (!cancelled) setBillingOn(false);
         }
       } catch (err) {
         if (!cancelled) {
@@ -262,18 +329,26 @@ export function DashboardView(): React.ReactNode {
     [consultations, tz]
   );
 
+  // Mapa fecha→ingresos desde billing (null si el módulo de cobros no está instalado).
+  const billingRevByDay = useMemo(
+    () => (billingOn ? billingRevenueByDay(billingAccounts, tz) : null),
+    [billingOn, billingAccounts, tz]
+  );
+
   const revenueToday = useMemo(() => {
+    if (billingRevByDay) return billingRevByDay.get(today) ?? 0;
     const ids = new Set(todayConsultations.map((c) => c.id));
     return sumRevenueForIds(ids, services);
-  }, [todayConsultations, services]);
+  }, [billingRevByDay, today, todayConsultations, services]);
 
   const revenueYesterday = useMemo(() => {
     const yesterday = daysFromNow(-1, tz);
+    if (billingRevByDay) return billingRevByDay.get(yesterday) ?? 0;
     const ids = new Set(
       consultations.filter((c) => dateKey(c.date, tz) === yesterday).map((c) => c.id)
     );
     return sumRevenueForIds(ids, services);
-  }, [consultations, services, tz]);
+  }, [billingRevByDay, consultations, services, tz]);
 
   const activePatients = useMemo(() => {
     const yearAgo = daysFromNow(-365, tz);
@@ -296,12 +371,26 @@ export function DashboardView(): React.ReactNode {
     }).length;
   }, [contacts, tz]);
 
-  const revenueDays = useMemo(
-    () => computeRevenueLast7Days(consultations, services, tz),
-    [consultations, services, tz]
-  );
+  const revenueDays = useMemo(() => {
+    if (billingRevByDay) {
+      const result: Array<{ date: string; label: string; revenue: number }> = [];
+      for (let i = 6; i >= 0; i--) {
+        const day = daysFromNow(-i, tz);
+        result.push({
+          date: day,
+          label: dayLabel(i, day, tz),
+          revenue: billingRevByDay.get(day) ?? 0,
+        });
+      }
+      return result;
+    }
+    return computeRevenueLast7Days(consultations, services, tz);
+  }, [billingRevByDay, consultations, services, tz]);
 
-  const topServices = useMemo(() => computeTopServices(services), [services]);
+  const topServices = useMemo(
+    () => (billingOn ? computeTopItemsFromBilling(billingLines) : computeTopServices(services)),
+    [billingOn, billingLines, services]
+  );
 
   const pendingAppointments = useMemo(
     () =>
