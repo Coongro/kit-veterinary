@@ -470,10 +470,15 @@ export function DashboardView(): React.ReactNode {
               parts.push(
                 `${todayConsultations.length} consulta${todayConsultations.length > 1 ? 's' : ''} hoy`
               );
-            if (pendingAppointments.length > 0)
-              parts.push(
-                `${pendingAppointments.length} turno${pendingAppointments.length > 1 ? 's' : ''} pendiente${pendingAppointments.length > 1 ? 's' : ''}`
-              );
+            if (pendingAppointments.length > 0) {
+              const plural = pendingAppointments.length > 1;
+              // Mismo vocabulario que los badges de estas tarjetas y la vista de Agenda:
+              // STATUS_LABELS['scheduled'] ("Agendado"). Se pasa a minúscula y se pluraliza para
+              // concordar con "turno(s)", en vez de hardcodear "pendiente" (que sugiere atraso y
+              // daba dos nombres distintos al mismo estado en la misma pantalla).
+              const statusWord = STATUS_LABELS.scheduled.toLowerCase() + (plural ? 's' : '');
+              parts.push(`${pendingAppointments.length} turno${plural ? 's' : ''} ${statusWord}`);
+            }
             return parts.join(' · ') || 'Sin actividad por el momento';
           })()
         )
