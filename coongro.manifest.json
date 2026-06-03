@@ -9,9 +9,53 @@
     ]
   },
   "contributes": {
+    "menuSections": [
+      {
+        "id": "clinical",
+        "label": "Clínico",
+        "order": 20
+      },
+      {
+        "id": "comercial",
+        "label": "Comercial",
+        "order": 30
+      },
+      {
+        "id": "org",
+        "label": "Organización",
+        "order": 40
+      }
+    ],
+    "menuAssignments": [
+      {
+        "pluginId": "@coongro/patients",
+        "section": "clinical"
+      },
+      {
+        "pluginId": "@coongro/consultations",
+        "section": "clinical"
+      },
+      {
+        "pluginId": "@coongro/appointments",
+        "section": "clinical"
+      },
+      {
+        "pluginId": "@coongro/vaccination",
+        "section": "clinical"
+      },
+      {
+        "pluginId": "@coongro/billing",
+        "section": "comercial"
+      },
+      {
+        "pluginId": "@coongro/vet-staff",
+        "section": "org"
+      }
+    ],
     "menus": [
       {
         "path": "Dashboard",
+        "section": "principal",
         "order": 0,
         "viewId": "kit-veterinary.dashboard.open",
         "icon": "assets/icons/dashboard.svg",
