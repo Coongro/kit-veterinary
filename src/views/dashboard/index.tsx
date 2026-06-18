@@ -50,7 +50,6 @@ interface Consultation {
   vet_name: string;
   date: UTCTimestamp;
   reason: string;
-  reason_category?: string;
   diagnosis?: string;
   created_at: UTCTimestamp;
 }
@@ -143,15 +142,22 @@ function dayLabel(daysAgo: number, dateStr: string, tz: string): string {
 
 // --- Cómputos ---
 
-function trendIndicator(current: number, previous: number): { text: string; color: string } {
+function trendIndicator(
+  current: number,
+  previous: number,
+  // Formateador del delta. Por defecto `String` (conteos crudos); para KPIs de plata se
+  // pasa `formatCurrency` para que el comparativo salga como moneda y no como número pelado.
+  format: (value: number) => string = String
+): { text: string; color: string } {
   if (previous === 0 && current === 0) return { text: '', color: 'var(--cg-text-muted)' };
-  if (previous === 0) return { text: `+${current}`, color: 'var(--cg-success-text, #16a34a)' };
+  if (previous === 0)
+    return { text: `+${format(current)}`, color: 'var(--cg-success-text, #16a34a)' };
 
   const diff = current - previous;
 
   if (diff === 0) return { text: '=', color: 'var(--cg-text-muted)' };
-  if (diff > 0) return { text: `+${diff}`, color: 'var(--cg-success-text, #16a34a)' };
-  return { text: String(diff), color: 'var(--cg-error-text, #dc2626)' };
+  if (diff > 0) return { text: `+${format(diff)}`, color: 'var(--cg-success-text, #16a34a)' };
+  return { text: format(diff), color: 'var(--cg-error-text, #dc2626)' };
 }
 
 /** Calcula ingresos por consulta para un rango de IDs */
@@ -265,17 +271,31 @@ export function DashboardView(): React.ReactNode {
       setLoading(true);
       setError(null);
       try {
-        const [cons, svcs, petList, contactList] = await Promise.all([
+        // Resiliencia: allSettled para que cada fuente degrade independiente. Si un plugin
+        // (consultations/patients/contacts) está caído o no instalado, el dashboard igual
+        // renderiza con lo que sí cargó, en vez de tirar TODO a la pantalla de error.
+        // (Antes: Promise.all — un solo fallo rompía el dashboard entero.)
+        const [consR, svcsR, petListR, contactListR] = await Promise.allSettled([
           actions.execute<Consultation[]>('consultations.records.list'),
           actions.execute<ConsultationService[]>('consultations.services.list'),
           actions.execute<Pet[]>('patients.pets.list'),
           actions.execute<Contact[]>('contacts.list'),
         ]);
         if (!cancelled) {
-          setConsultations(Array.isArray(cons) ? cons : []);
-          setServices(Array.isArray(svcs) ? svcs : []);
-          setPets(Array.isArray(petList) ? petList : []);
-          setContacts(Array.isArray(contactList) ? contactList : []);
+          setConsultations(
+            consR.status === 'fulfilled' && Array.isArray(consR.value) ? consR.value : []
+          );
+          setServices(
+            svcsR.status === 'fulfilled' && Array.isArray(svcsR.value) ? svcsR.value : []
+          );
+          setPets(
+            petListR.status === 'fulfilled' && Array.isArray(petListR.value) ? petListR.value : []
+          );
+          setContacts(
+            contactListR.status === 'fulfilled' && Array.isArray(contactListR.value)
+              ? contactListR.value
+              : []
+          );
         }
         // Cobros (billing): fuente de ingresos si el plugin está instalado. Dependencia
         // blanda — si no está, el dashboard sigue calculando desde consultation_services.
@@ -388,7 +408,10 @@ export function DashboardView(): React.ReactNode {
   }, [billingRevByDay, consultations, services, tz]);
 
   const topServices = useMemo(
-    () => (billingOn ? computeTopItemsFromBilling(billingLines) : computeTopServices(services)),
+    () =>
+      (billingOn ? computeTopItemsFromBilling(billingLines) : computeTopServices(services))
+        // "Más facturados": ítems sin facturación (revenue 0, ej. "Eutanasia $0") no aportan, se ocultan.
+        .filter((s) => s.revenue > 0),
     [billingOn, billingLines, services]
   );
 
@@ -415,7 +438,7 @@ export function DashboardView(): React.ReactNode {
   // --- Tendencias ---
 
   const consultationTrend = trendIndicator(todayConsultations.length, lastWeekSameDayCount);
-  const revenueTrend = trendIndicator(revenueToday, revenueYesterday);
+  const revenueTrend = trendIndicator(revenueToday, revenueYesterday, formatCurrency);
   const clientTrend = trendIndicator(newClientsMonth, newClientsLastMonth);
   const maxRevenue = Math.max(...revenueDays.map((d) => d.revenue), 1);
   const maxServiceRevenue = topServices.length > 0 ? topServices[0].revenue : 1;
@@ -470,10 +493,15 @@ export function DashboardView(): React.ReactNode {
               parts.push(
                 `${todayConsultations.length} consulta${todayConsultations.length > 1 ? 's' : ''} hoy`
               );
-            if (pendingAppointments.length > 0)
-              parts.push(
-                `${pendingAppointments.length} turno${pendingAppointments.length > 1 ? 's' : ''} pendiente${pendingAppointments.length > 1 ? 's' : ''}`
-              );
+            if (pendingAppointments.length > 0) {
+              const plural = pendingAppointments.length > 1;
+              // Mismo vocabulario que los badges de estas tarjetas y la vista de Agenda:
+              // STATUS_LABELS['scheduled'] ("Agendado"). Se pasa a minúscula y se pluraliza para
+              // concordar con "turno(s)", en vez de hardcodear "pendiente" (que sugiere atraso y
+              // daba dos nombres distintos al mismo estado en la misma pantalla).
+              const statusWord = STATUS_LABELS.scheduled.toLowerCase() + (plural ? 's' : '');
+              parts.push(`${pendingAppointments.length} turno${plural ? 's' : ''} ${statusWord}`);
+            }
             return parts.join(' · ') || 'Sin actividad por el momento';
           })()
         )
