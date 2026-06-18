@@ -57,7 +57,7 @@
       { "pluginId": "@coongro/billing", "path": "Caja", "section": "principal", "order": 5 },
 
       { "pluginId": "@coongro/purchases", "section": "dinero" },
-      { "pluginId": "@coongro/purchases", "path": "Compras", "section": "dinero", "order": 40 },
+      { "pluginId": "@coongro/purchases", "path": "Salidas", "section": "dinero", "order": 40 },
 
       { "pluginId": "@coongro/vet-staff", "section": "equipo" },
       { "pluginId": "@coongro/vet-staff", "path": "Personal", "section": "equipo", "order": 10 }
