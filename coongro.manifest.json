@@ -11,58 +11,60 @@
   "contributes": {
     "menuSections": [
       {
-        "id": "clinical",
-        "label": "Clínico",
+        "id": "clinica",
+        "label": "Clínica",
         "order": 20
       },
       {
-        "id": "comercial",
-        "label": "Comercial",
+        "id": "dinero",
+        "label": "Dinero",
         "order": 30
       },
       {
-        "id": "org",
-        "label": "Organización",
+        "id": "equipo",
+        "label": "Equipo",
         "order": 40
       }
     ],
     "menuAssignments": [
-      {
-        "pluginId": "@coongro/patients",
-        "section": "clinical"
-      },
+      { "pluginId": "@coongro/patients", "section": "clinica" },
+      { "pluginId": "@coongro/patients", "path": "Pacientes", "section": "clinica", "order": 10 },
+
+      { "pluginId": "@coongro/consultations", "section": "clinica" },
+      { "pluginId": "@coongro/consultations", "path": "Consultas", "section": "clinica", "order": 20 },
       {
         "pluginId": "@coongro/consultations",
-        "section": "clinical"
+        "path": "Servicios y Precios",
+        "section": "dinero",
+        "order": 30
       },
+
+      { "pluginId": "@coongro/vaccination", "section": "clinica" },
+      { "pluginId": "@coongro/vaccination", "path": "Vacunación", "section": "clinica", "order": 30 },
+
+      { "pluginId": "@coongro/vet-pharmacy", "section": "clinica" },
+      { "pluginId": "@coongro/vet-pharmacy", "path": "Farmacia", "section": "clinica", "order": 40 },
+
       {
         "pluginId": "@coongro/appointments",
-        "section": "clinical"
+        "path": "Consultas/Agenda",
+        "section": "principal",
+        "order": 10
       },
-      {
-        "pluginId": "@coongro/vaccination",
-        "section": "clinical"
-      },
-      {
-        "pluginId": "@coongro/vet-pharmacy",
-        "section": "clinical"
-      },
-      {
-        "pluginId": "@coongro/billing",
-        "section": "comercial"
-      },
-      {
-        "pluginId": "@coongro/purchases",
-        "section": "comercial"
-      },
-      {
-        "pluginId": "@coongro/vet-staff",
-        "section": "org"
-      }
+
+      { "pluginId": "@coongro/billing", "section": "dinero" },
+      { "pluginId": "@coongro/billing", "path": "Cobros", "section": "dinero", "order": 10 },
+      { "pluginId": "@coongro/billing", "path": "Caja", "section": "principal", "order": 5 },
+
+      { "pluginId": "@coongro/purchases", "section": "dinero" },
+      { "pluginId": "@coongro/purchases", "path": "Compras", "section": "dinero", "order": 40 },
+
+      { "pluginId": "@coongro/vet-staff", "section": "equipo" },
+      { "pluginId": "@coongro/vet-staff", "path": "Personal", "section": "equipo", "order": 10 }
     ],
     "menus": [
       {
-        "path": "Dashboard",
+        "path": "Inicio",
         "section": "principal",
         "order": 0,
         "viewId": "kit-veterinary.dashboard.open",
