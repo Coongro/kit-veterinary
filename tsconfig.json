@@ -46,6 +46,9 @@
       "@coongro/patients": [
         "../patients/dist/index.d.ts"
       ],
+      "@coongro/products": [
+        "../products/dist/index.d.ts"
+      ],
       "@coongro/datetime": [
         "../../packages/datetime/dist/index.d.ts"
       ]
