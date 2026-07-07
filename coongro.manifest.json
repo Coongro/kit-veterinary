@@ -3,6 +3,9 @@
   "version": "0.4.0",
   "apiVersion": "2.0",
   "initView": "kit-veterinary.dashboard.open",
+  "copilotContext": {
+    "file": "copilot-context.md"
+  },
   "assets": {
     "styles": [
       "./dist/assets/tailwind.css"
@@ -32,41 +35,100 @@
       }
     ],
     "menuAssignments": [
-      { "pluginId": "@coongro/patients", "section": "clinica" },
-      { "pluginId": "@coongro/patients", "path": "Pacientes", "section": "clinica", "order": 10 },
-
-      { "pluginId": "@coongro/consultations", "section": "clinica" },
-      { "pluginId": "@coongro/consultations", "path": "Consultas", "section": "clinica", "order": 20 },
+      {
+        "pluginId": "@coongro/patients",
+        "section": "clinica"
+      },
+      {
+        "pluginId": "@coongro/patients",
+        "path": "Pacientes",
+        "section": "clinica",
+        "order": 10
+      },
+      {
+        "pluginId": "@coongro/consultations",
+        "section": "clinica"
+      },
+      {
+        "pluginId": "@coongro/consultations",
+        "path": "Consultas",
+        "section": "clinica",
+        "order": 20
+      },
       {
         "pluginId": "@coongro/consultations",
         "path": "Servicios y Precios",
         "section": "dinero",
         "order": 30
       },
-
-      { "pluginId": "@coongro/vaccination", "section": "clinica" },
-      { "pluginId": "@coongro/vaccination", "path": "Vacunación", "section": "clinica", "order": 30 },
-
-      { "pluginId": "@coongro/vet-pharmacy", "section": "clinica" },
-      { "pluginId": "@coongro/vet-pharmacy", "path": "Farmacia", "section": "clinica", "order": 40 },
-
+      {
+        "pluginId": "@coongro/vaccination",
+        "section": "clinica"
+      },
+      {
+        "pluginId": "@coongro/vaccination",
+        "path": "Vacunación",
+        "section": "clinica",
+        "order": 30
+      },
+      {
+        "pluginId": "@coongro/vet-pharmacy",
+        "section": "clinica"
+      },
+      {
+        "pluginId": "@coongro/vet-pharmacy",
+        "path": "Farmacia",
+        "section": "clinica",
+        "order": 40
+      },
       {
         "pluginId": "@coongro/appointments",
         "path": "Consultas/Agenda",
         "section": "principal",
         "order": 10
       },
-
-      { "pluginId": "@coongro/billing", "section": "dinero" },
-      { "pluginId": "@coongro/billing", "path": "Cobros", "section": "dinero", "order": 10 },
-      { "pluginId": "@coongro/billing", "path": "Caja", "section": "principal", "order": 5 },
-
-      { "pluginId": "@coongro/purchases", "section": "dinero" },
-      { "pluginId": "@coongro/purchases", "path": "Salidas", "section": "dinero", "order": 40 },
-      { "pluginId": "@coongro/purchases", "path": "Proveedores", "section": "equipo", "order": 20 },
-
-      { "pluginId": "@coongro/vet-staff", "section": "equipo" },
-      { "pluginId": "@coongro/vet-staff", "path": "Personal", "section": "equipo", "order": 10 }
+      {
+        "pluginId": "@coongro/billing",
+        "section": "dinero"
+      },
+      {
+        "pluginId": "@coongro/billing",
+        "path": "Cobros",
+        "section": "dinero",
+        "order": 10
+      },
+      {
+        "pluginId": "@coongro/billing",
+        "path": "Caja",
+        "section": "principal",
+        "order": 5
+      },
+      {
+        "pluginId": "@coongro/purchases",
+        "section": "dinero"
+      },
+      {
+        "pluginId": "@coongro/purchases",
+        "path": "Salidas",
+        "section": "dinero",
+        "order": 40
+      },
+      {
+        "pluginId": "@coongro/purchases",
+        "path": "Proveedores",
+        "section": "equipo",
+        "order": 20
+      },
+      {
+        "pluginId": "@coongro/vet-staff",
+        "section": "equipo"
+      },
+      {
+        "pluginId": "@coongro/vet-staff",
+        "path": "Personal",
+        "section": "equipo",
+        "order": 10
+      }
     ],
     "menus": [
       {

@@ -18,7 +18,8 @@
   "files": [
     "dist",
     "assets",
-    "coongro.manifest.json"
+    "coongro.manifest.json",
+    "copilot-context.md"
   ],
   "scripts": {
     "build": "npm run build:css && tsc",
