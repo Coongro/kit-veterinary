@@ -82,12 +82,6 @@
         "order": 40
       },
       {
-        "pluginId": "@coongro/appointments",
-        "path": "Consultas/Agenda",
-        "section": "principal",
-        "order": 10
-      },
-      {
         "pluginId": "@coongro/billing",
         "section": "dinero"
       },
@@ -96,12 +90,6 @@
         "path": "Cobros",
         "section": "dinero",
         "order": 10
-      },
-      {
-        "pluginId": "@coongro/billing",
-        "path": "Caja",
-        "section": "principal",
-        "order": 5
       },
       {
         "pluginId": "@coongro/purchases",
@@ -128,6 +116,24 @@
         "path": "Personal",
         "section": "equipo",
         "order": 10
+      },
+      {
+        "pluginId": "@coongro/kit-veterinary",
+        "path": "Inicio",
+        "section": "principal",
+        "order": 10
+      },
+      {
+        "pluginId": "@coongro/billing",
+        "path": "Caja",
+        "section": "principal",
+        "order": 20
+      },
+      {
+        "pluginId": "@coongro/appointments",
+        "path": "Consultas/Agenda",
+        "section": "principal",
+        "order": 30
       }
     ],
     "menus": [
