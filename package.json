@@ -48,6 +48,8 @@
     "@coongro/consultations": ">=0.1.0",
     "@coongro/patients": ">=1.0.0",
     "@coongro/products": ">=2.0.0",
+    "@coongro/vaccination": ">=1.0.0",
+    "@coongro/vademecum": ">=0.1.2",
     "@coongro/vet-staff": ">=0.1.0"
   },
   "peerDependencies": {
