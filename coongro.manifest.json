@@ -134,6 +134,12 @@
         "path": "Consultas/Agenda",
         "section": "principal",
         "order": 30
+      },
+      {
+        "pluginId": "@coongro/vet-inventory",
+        "path": "Lotes y stock",
+        "section": "inventario",
+        "order": 10
       }
     ],
     "menus": [
@@ -144,13 +150,6 @@
         "viewId": "kit-veterinary.dashboard.open",
         "icon": "assets/icons/dashboard.svg",
         "color": "#6366F1"
-      },
-      {
-        "path": "Lotes y stock",
-        "section": "inventario",
-        "order": 10,
-        "viewId": "kit-veterinary.lotes.open",
-        "icon": "Boxes"
       }
     ],
     "views": [
@@ -159,12 +158,6 @@
         "title": "Dashboard",
         "component": "./dist/views/dashboard/index.js",
         "export": "DashboardView"
-      },
-      {
-        "id": "kit-veterinary.lotes.open",
-        "title": "Lotes y stock",
-        "component": "./dist/views/lotes/index.js",
-        "export": "LotesView"
       }
     ],
     "repositories": []
