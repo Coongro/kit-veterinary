@@ -102,20 +102,8 @@
         "order": 40
       },
       {
-        "pluginId": "@coongro/purchases",
-        "path": "Proveedores",
-        "section": "equipo",
-        "order": 20
-      },
-      {
         "pluginId": "@coongro/vet-staff",
         "section": "equipo"
-      },
-      {
-        "pluginId": "@coongro/vet-staff",
-        "path": "Personal",
-        "section": "equipo",
-        "order": 10
       },
       {
         "pluginId": "@coongro/kit-veterinary",
@@ -140,6 +128,24 @@
         "path": "Lotes y stock",
         "section": "inventario",
         "order": 10
+      },
+      {
+        "pluginId": "@coongro/vademecum",
+        "path": "Laboratorios",
+        "section": "equipo",
+        "order": 10
+      },
+      {
+        "pluginId": "@coongro/vet-staff",
+        "path": "Personal",
+        "section": "equipo",
+        "order": 20
+      },
+      {
+        "pluginId": "@coongro/purchases",
+        "path": "Proveedores",
+        "section": "equipo",
+        "order": 30
       }
     ],
     "menus": [
