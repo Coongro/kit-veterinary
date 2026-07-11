@@ -67,7 +67,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git fetch origin develop
-          git checkout develop
+          git checkout -f develop
           if git merge origin/staging --no-edit; then
             git push origin develop
             echo "### ✅ develop synced with staging" >> $GITHUB_STEP_SUMMARY
