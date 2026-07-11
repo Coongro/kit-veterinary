@@ -1,5 +1,32 @@
 # @coongro/kit-veterinary
 
+## 0.5.0
+
+### Minor Changes
+
+- 43d2d08: feat(copilot): declarar contexto de negocio veterinario para el Copilot IA
+
+  Agrega `copilot-context.md` (contexto del rubro veterinario) y lo declara en el
+  manifest vía `copilotContext: { file }`, para que el Copilot IA lo anexe a su
+  prompt base cuando el kit está activo en el tenant.
+
+- 427d8a0: El dashboard ahora calcula los ingresos (KPI "Ingresos Hoy", gráfico de 7 días y "Servicios más frecuentes") desde el módulo de cobros (@coongro/billing) cuando está instalado. Esto incluye las ventas de mostrador —como vacunas aplicadas fuera de una consulta— que antes eran invisibles al sumar solo los servicios de consultas. Si billing no está instalado, el dashboard sigue calculando desde los servicios de consultas (dependencia blanda).
+- 0f7a93c: feat: vista unificada de Lotes en Farmacia (medicamentos + vacunas) (COONG-220)
+
+  Nueva vista "Farmacia → Lotes" que compone la `BatchesView` genérica de `@coongro/products`, inyectando los clasificadores de tipo del kit: vacunas (vía `vaccination.catalog.list`) y medicamentos (vía `vet-pharmacy.medications.list`). Una sola tabla de lotes para todo lo loteable, con filtro por tipo y vencimiento, en lugar de la antigua vista siloada bajo Vacunación. Las dependencias hacia vaccination/vet-pharmacy son blandas: si un plugin no está instalado, su tipo simplemente no aparece.
+
+### Patch Changes
+
+- 6faebbb: Declara `@coongro/vaccination` y `@coongro/vademecum` como dependencias. La vista de Lotes ya consumía sus RPCs (`vaccination.catalog.list` y `vademecum.laboratories.list`) para mostrar el laboratorio en el subtítulo del lote, pero al no declararlos no venían con el kit y la feature degradaba en silencio. Ahora instalar el kit veterinario instala también el módulo de vacunación y el maestro de laboratorios (COONG-240).
+- 81656ef: fix(dashboard): brand variant + ingresos label width (COONG-112)
+
+  - "Registrar Paciente" button: drop variant='outline' so it matches the brand-yellow style of "Nueva Consulta" next to it.
+  - Ingresos card: date label width w-12→w-20 + whitespace-nowrap so dates like "19/4/2026" fit on one line instead of wrapping below the bar.
+
+- b9032d0: Menú: la sección "Equipo" pasa a llamarse "Directorio" (ahora agrupa Personal + Proveedores, que son maestros/directorios de entidades, no flujos de dinero). Se asigna el ítem "Proveedores" (de purchases) a esa sección.
+- b2b463f: Reorganización de menú: Caja pasa a nivel principal (Inicio·Caja·Agenda), Consultas y Personal abren su vista directa, y "Servicios y Precios" se mueve a Dinero como ítem propio.
+- 8493fc5: El menú reasigna "Salidas" (antes "Compras") del plugin purchases a la sección Dinero.
+
 ## 0.4.1
 
 ### Patch Changes

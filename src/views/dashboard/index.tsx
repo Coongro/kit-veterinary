@@ -50,7 +50,6 @@ interface Consultation {
   vet_name: string;
   date: UTCTimestamp;
   reason: string;
-  reason_category?: string;
   diagnosis?: string;
   created_at: UTCTimestamp;
 }
@@ -76,6 +75,24 @@ interface Contact {
   id: string;
   name: string;
   created_at: UTCTimestamp;
+}
+
+/** Cuenta de cobro (billing) con su total derivado. `opened_at` = fecha de negocio (ISO). */
+interface BillingAccount {
+  total: string;
+  opened_at: string;
+  status: string;
+  source: string;
+}
+
+/** Línea de cobro (billing) con la fecha/origen de su cuenta, para agregados por período. */
+interface BillingLine {
+  description: string;
+  quantity: string;
+  subtotal: string;
+  source_type: string;
+  account_source: string;
+  opened_at: string;
 }
 
 // --- Helpers de fecha (basados en @coongro/calendar) ---
@@ -125,15 +142,22 @@ function dayLabel(daysAgo: number, dateStr: string, tz: string): string {
 
 // --- Cómputos ---
 
-function trendIndicator(current: number, previous: number): { text: string; color: string } {
+function trendIndicator(
+  current: number,
+  previous: number,
+  // Formateador del delta. Por defecto `String` (conteos crudos); para KPIs de plata se
+  // pasa `formatCurrency` para que el comparativo salga como moneda y no como número pelado.
+  format: (value: number) => string = String
+): { text: string; color: string } {
   if (previous === 0 && current === 0) return { text: '', color: 'var(--cg-text-muted)' };
-  if (previous === 0) return { text: `+${current}`, color: 'var(--cg-success-text, #16a34a)' };
+  if (previous === 0)
+    return { text: `+${format(current)}`, color: 'var(--cg-success-text, #16a34a)' };
 
   const diff = current - previous;
 
   if (diff === 0) return { text: '=', color: 'var(--cg-text-muted)' };
-  if (diff > 0) return { text: `+${diff}`, color: 'var(--cg-success-text, #16a34a)' };
-  return { text: String(diff), color: 'var(--cg-error-text, #dc2626)' };
+  if (diff > 0) return { text: `+${format(diff)}`, color: 'var(--cg-success-text, #16a34a)' };
+  return { text: format(diff), color: 'var(--cg-error-text, #dc2626)' };
 }
 
 /** Calcula ingresos por consulta para un rango de IDs */
@@ -180,6 +204,37 @@ function computeTopServices(
     .slice(0, 5);
 }
 
+// --- Cómputos desde billing (cuando el módulo de cobros está instalado) ---
+// El KPI de ingresos pasa a salir de las CUENTAS de cobro: incluye consultas Y ventas de
+// mostrador (vacunas sueltas), que antes eran invisibles al sumar solo consultation_services.
+
+/** Ingresos por día local del tenant, a partir de las cuentas de billing (clave = opened_at). */
+function billingRevenueByDay(accounts: BillingAccount[], tz: string): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const a of accounts) {
+    const key = dateKey(a.opened_at as UTCTimestamp, tz);
+    map.set(key, (map.get(key) ?? 0) + Number(a.total || 0));
+  }
+  return map;
+}
+
+/** Ítems más cobrados (servicios + vacunas + productos) a partir de las líneas de billing. */
+function computeTopItemsFromBilling(
+  lines: BillingLine[]
+): Array<{ name: string; count: number; revenue: number }> {
+  const map = new Map<string, { count: number; revenue: number }>();
+  for (const l of lines) {
+    const cur = map.get(l.description) ?? { count: 0, revenue: 0 };
+    cur.count += Number(l.quantity || 1);
+    cur.revenue += Number(l.subtotal || 0);
+    map.set(l.description, cur);
+  }
+  return Array.from(map.entries())
+    .map(([name, data]) => ({ name, ...data }))
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 5);
+}
+
 // --- Helpers de render ---
 
 function trendFooter(trend: { text: string; color: string }, label: string): React.ReactNode {
@@ -196,6 +251,9 @@ export function DashboardView(): React.ReactNode {
   const [services, setServices] = useState<ConsultationService[]>([]);
   const [pets, setPets] = useState<Pet[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [billingAccounts, setBillingAccounts] = useState<BillingAccount[]>([]);
+  const [billingLines, setBillingLines] = useState<BillingLine[]>([]);
+  const [billingOn, setBillingOn] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -213,17 +271,46 @@ export function DashboardView(): React.ReactNode {
       setLoading(true);
       setError(null);
       try {
-        const [cons, svcs, petList, contactList] = await Promise.all([
+        // Resiliencia: allSettled para que cada fuente degrade independiente. Si un plugin
+        // (consultations/patients/contacts) está caído o no instalado, el dashboard igual
+        // renderiza con lo que sí cargó, en vez de tirar TODO a la pantalla de error.
+        // (Antes: Promise.all — un solo fallo rompía el dashboard entero.)
+        const [consR, svcsR, petListR, contactListR] = await Promise.allSettled([
           actions.execute<Consultation[]>('consultations.records.list'),
           actions.execute<ConsultationService[]>('consultations.services.list'),
           actions.execute<Pet[]>('patients.pets.list'),
           actions.execute<Contact[]>('contacts.list'),
         ]);
         if (!cancelled) {
-          setConsultations(Array.isArray(cons) ? cons : []);
-          setServices(Array.isArray(svcs) ? svcs : []);
-          setPets(Array.isArray(petList) ? petList : []);
-          setContacts(Array.isArray(contactList) ? contactList : []);
+          setConsultations(
+            consR.status === 'fulfilled' && Array.isArray(consR.value) ? consR.value : []
+          );
+          setServices(
+            svcsR.status === 'fulfilled' && Array.isArray(svcsR.value) ? svcsR.value : []
+          );
+          setPets(
+            petListR.status === 'fulfilled' && Array.isArray(petListR.value) ? petListR.value : []
+          );
+          setContacts(
+            contactListR.status === 'fulfilled' && Array.isArray(contactListR.value)
+              ? contactListR.value
+              : []
+          );
+        }
+        // Cobros (billing): fuente de ingresos si el plugin está instalado. Dependencia
+        // blanda — si no está, el dashboard sigue calculando desde consultation_services.
+        try {
+          const [accts, lines] = await Promise.all([
+            actions.execute<BillingAccount[]>('billing.accounts.listWithTotals'),
+            actions.execute<BillingLine[]>('billing.lines.listInRange'),
+          ]);
+          if (!cancelled) {
+            setBillingAccounts(Array.isArray(accts) ? accts : []);
+            setBillingLines(Array.isArray(lines) ? lines : []);
+            setBillingOn(true);
+          }
+        } catch {
+          if (!cancelled) setBillingOn(false);
         }
       } catch (err) {
         if (!cancelled) {
@@ -262,18 +349,26 @@ export function DashboardView(): React.ReactNode {
     [consultations, tz]
   );
 
+  // Mapa fecha→ingresos desde billing (null si el módulo de cobros no está instalado).
+  const billingRevByDay = useMemo(
+    () => (billingOn ? billingRevenueByDay(billingAccounts, tz) : null),
+    [billingOn, billingAccounts, tz]
+  );
+
   const revenueToday = useMemo(() => {
+    if (billingRevByDay) return billingRevByDay.get(today) ?? 0;
     const ids = new Set(todayConsultations.map((c) => c.id));
     return sumRevenueForIds(ids, services);
-  }, [todayConsultations, services]);
+  }, [billingRevByDay, today, todayConsultations, services]);
 
   const revenueYesterday = useMemo(() => {
     const yesterday = daysFromNow(-1, tz);
+    if (billingRevByDay) return billingRevByDay.get(yesterday) ?? 0;
     const ids = new Set(
       consultations.filter((c) => dateKey(c.date, tz) === yesterday).map((c) => c.id)
     );
     return sumRevenueForIds(ids, services);
-  }, [consultations, services, tz]);
+  }, [billingRevByDay, consultations, services, tz]);
 
   const activePatients = useMemo(() => {
     const yearAgo = daysFromNow(-365, tz);
@@ -296,12 +391,29 @@ export function DashboardView(): React.ReactNode {
     }).length;
   }, [contacts, tz]);
 
-  const revenueDays = useMemo(
-    () => computeRevenueLast7Days(consultations, services, tz),
-    [consultations, services, tz]
-  );
+  const revenueDays = useMemo(() => {
+    if (billingRevByDay) {
+      const result: Array<{ date: string; label: string; revenue: number }> = [];
+      for (let i = 6; i >= 0; i--) {
+        const day = daysFromNow(-i, tz);
+        result.push({
+          date: day,
+          label: dayLabel(i, day, tz),
+          revenue: billingRevByDay.get(day) ?? 0,
+        });
+      }
+      return result;
+    }
+    return computeRevenueLast7Days(consultations, services, tz);
+  }, [billingRevByDay, consultations, services, tz]);
 
-  const topServices = useMemo(() => computeTopServices(services), [services]);
+  const topServices = useMemo(
+    () =>
+      (billingOn ? computeTopItemsFromBilling(billingLines) : computeTopServices(services))
+        // "Más facturados": ítems sin facturación (revenue 0, ej. "Eutanasia $0") no aportan, se ocultan.
+        .filter((s) => s.revenue > 0),
+    [billingOn, billingLines, services]
+  );
 
   const pendingAppointments = useMemo(
     () =>
@@ -326,7 +438,7 @@ export function DashboardView(): React.ReactNode {
   // --- Tendencias ---
 
   const consultationTrend = trendIndicator(todayConsultations.length, lastWeekSameDayCount);
-  const revenueTrend = trendIndicator(revenueToday, revenueYesterday);
+  const revenueTrend = trendIndicator(revenueToday, revenueYesterday, formatCurrency);
   const clientTrend = trendIndicator(newClientsMonth, newClientsLastMonth);
   const maxRevenue = Math.max(...revenueDays.map((d) => d.revenue), 1);
   const maxServiceRevenue = topServices.length > 0 ? topServices[0].revenue : 1;
@@ -381,10 +493,15 @@ export function DashboardView(): React.ReactNode {
               parts.push(
                 `${todayConsultations.length} consulta${todayConsultations.length > 1 ? 's' : ''} hoy`
               );
-            if (pendingAppointments.length > 0)
-              parts.push(
-                `${pendingAppointments.length} turno${pendingAppointments.length > 1 ? 's' : ''} pendiente${pendingAppointments.length > 1 ? 's' : ''}`
-              );
+            if (pendingAppointments.length > 0) {
+              const plural = pendingAppointments.length > 1;
+              // Mismo vocabulario que los badges de estas tarjetas y la vista de Agenda:
+              // STATUS_LABELS['scheduled'] ("Agendado"). Se pasa a minúscula y se pluraliza para
+              // concordar con "turno(s)", en vez de hardcodear "pendiente" (que sugiere atraso y
+              // daba dos nombres distintos al mismo estado en la misma pantalla).
+              const statusWord = STATUS_LABELS.scheduled.toLowerCase() + (plural ? 's' : '');
+              parts.push(`${pendingAppointments.length} turno${plural ? 's' : ''} ${statusWord}`);
+            }
             return parts.join(' · ') || 'Sin actividad por el momento';
           })()
         )

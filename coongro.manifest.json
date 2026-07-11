@@ -1,21 +1,156 @@
 {
   "id": "kit-veterinary",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "apiVersion": "2.0",
   "initView": "kit-veterinary.dashboard.open",
+  "copilotContext": {
+    "file": "copilot-context.md"
+  },
   "assets": {
     "styles": [
       "./dist/assets/tailwind.css"
     ]
   },
   "contributes": {
+    "menuSections": [
+      {
+        "id": "clinica",
+        "label": "Clínica",
+        "order": 20
+      },
+      {
+        "id": "inventario",
+        "label": "Inventario",
+        "order": 25
+      },
+      {
+        "id": "dinero",
+        "label": "Dinero",
+        "order": 30
+      },
+      {
+        "id": "equipo",
+        "label": "Directorio",
+        "order": 40
+      }
+    ],
+    "menuAssignments": [
+      {
+        "pluginId": "@coongro/patients",
+        "section": "clinica"
+      },
+      {
+        "pluginId": "@coongro/patients",
+        "path": "Pacientes",
+        "section": "clinica",
+        "order": 10
+      },
+      {
+        "pluginId": "@coongro/consultations",
+        "section": "clinica"
+      },
+      {
+        "pluginId": "@coongro/consultations",
+        "path": "Consultas",
+        "section": "clinica",
+        "order": 20
+      },
+      {
+        "pluginId": "@coongro/consultations",
+        "path": "Servicios y Precios",
+        "section": "dinero",
+        "order": 30
+      },
+      {
+        "pluginId": "@coongro/vaccination",
+        "section": "clinica"
+      },
+      {
+        "pluginId": "@coongro/vaccination",
+        "path": "Vacunación",
+        "section": "clinica",
+        "order": 30
+      },
+      {
+        "pluginId": "@coongro/vet-pharmacy",
+        "section": "clinica"
+      },
+      {
+        "pluginId": "@coongro/vet-pharmacy",
+        "path": "Farmacia",
+        "section": "clinica",
+        "order": 40
+      },
+      {
+        "pluginId": "@coongro/billing",
+        "section": "dinero"
+      },
+      {
+        "pluginId": "@coongro/billing",
+        "path": "Cobros",
+        "section": "dinero",
+        "order": 10
+      },
+      {
+        "pluginId": "@coongro/purchases",
+        "section": "dinero"
+      },
+      {
+        "pluginId": "@coongro/purchases",
+        "path": "Salidas",
+        "section": "dinero",
+        "order": 40
+      },
+      {
+        "pluginId": "@coongro/purchases",
+        "path": "Proveedores",
+        "section": "equipo",
+        "order": 20
+      },
+      {
+        "pluginId": "@coongro/vet-staff",
+        "section": "equipo"
+      },
+      {
+        "pluginId": "@coongro/vet-staff",
+        "path": "Personal",
+        "section": "equipo",
+        "order": 10
+      },
+      {
+        "pluginId": "@coongro/kit-veterinary",
+        "path": "Inicio",
+        "section": "principal",
+        "order": 10
+      },
+      {
+        "pluginId": "@coongro/billing",
+        "path": "Caja",
+        "section": "principal",
+        "order": 20
+      },
+      {
+        "pluginId": "@coongro/appointments",
+        "path": "Consultas/Agenda",
+        "section": "principal",
+        "order": 30
+      }
+    ],
     "menus": [
       {
-        "path": "Dashboard",
+        "path": "Inicio",
+        "section": "principal",
         "order": 0,
         "viewId": "kit-veterinary.dashboard.open",
         "icon": "assets/icons/dashboard.svg",
         "color": "#6366F1"
+      },
+      {
+        "path": "Lotes y stock",
+        "section": "inventario",
+        "order": 10,
+        "viewId": "kit-veterinary.lotes.open",
+        "icon": "Boxes"
       }
     ],
     "views": [
@@ -24,6 +159,12 @@
         "title": "Dashboard",
         "component": "./dist/views/dashboard/index.js",
         "export": "DashboardView"
+      },
+      {
+        "id": "kit-veterinary.lotes.open",
+        "title": "Lotes y stock",
+        "component": "./dist/views/lotes/index.js",
+        "export": "LotesView"
       }
     ],
     "repositories": []
