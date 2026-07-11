@@ -53,6 +53,7 @@
     "@coongro/purchases": ">=0.2.0",
     "@coongro/vaccination": ">=0.2.0",
     "@coongro/vademecum": ">=0.1.2",
+    "@coongro/vademecum-senasa": ">=0.2.0",
     "@coongro/vet-pharmacy": ">=1.1.0",
     "@coongro/vet-staff": ">=0.1.0"
   },
