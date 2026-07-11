@@ -1,6 +1,6 @@
 {
   "id": "kit-veterinary",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "apiVersion": "2.0",
   "initView": "kit-veterinary.dashboard.open",
   "copilotContext": {

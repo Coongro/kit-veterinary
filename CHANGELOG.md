@@ -1,5 +1,15 @@
 # @coongro/kit-veterinary
 
+## 0.7.0
+
+### Minor Changes
+
+- 13c6845: feat: instalar el provider de catalogo SENASA (vademecum-senasa) con el kit
+
+  El autofill SENASA (vacunacion) y el catalogo de farmacia llaman vademecum.catalog.*,
+  que registra el plugin vademecum-senasa. Declararlo como dep del kit lo instala en el
+  tenant y el RPC deja de dar 404 not registered.
+
 ## 0.6.0
 
 ### Minor Changes
