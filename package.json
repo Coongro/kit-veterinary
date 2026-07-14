@@ -45,16 +45,12 @@
   },
   "dependencies": {
     "@coongro/appointments": ">=0.2.0",
-    "@coongro/billing": ">=0.2.0",
     "@coongro/calendar": ">=0.1.0",
     "@coongro/consultations": ">=0.1.0",
     "@coongro/patients": ">=1.0.0",
-    "@coongro/products": ">=1.3.0",
     "@coongro/purchases": ">=0.2.0",
-    "@coongro/vaccination": ">=0.2.0",
-    "@coongro/vademecum": ">=0.1.2",
     "@coongro/vademecum-senasa": ">=0.2.0",
-    "@coongro/vet-pharmacy": ">=1.1.0",
+    "@coongro/vet-inventory": ">=0.1.0",
     "@coongro/vet-staff": ">=0.1.0"
   },
   "peerDependencies": {
