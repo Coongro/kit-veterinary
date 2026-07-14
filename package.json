@@ -1,6 +1,6 @@
 {
   "name": "@coongro/kit-veterinary",
-  "version": "0.4.0",
+  "version": "0.7.0",
   "type": "module",
   "description": "Kit base para gestión veterinaria. Incluye pacientes, consultas, productos, contactos y turnos.",
   "main": "dist/index.js",
@@ -48,7 +48,8 @@
     "@coongro/calendar": ">=0.1.0",
     "@coongro/consultations": ">=0.1.0",
     "@coongro/patients": ">=1.0.0",
-    "@coongro/products": ">=2.0.0",
+    "@coongro/purchases": ">=0.2.0",
+    "@coongro/vademecum-senasa": ">=0.2.0",
     "@coongro/vet-inventory": ">=0.1.0",
     "@coongro/vet-staff": ">=0.1.0"
   },
