@@ -92,6 +92,8 @@ interface BillingLine {
   subtotal: string;
   source_type: string;
   account_source: string;
+  /** 'receivable' cobros | 'payable' salidas. Ausente en billing viejos. */
+  account_direction?: string;
   opened_at: string;
 }
 
@@ -300,13 +302,20 @@ export function DashboardView(): React.ReactNode {
         // Cobros (billing): fuente de ingresos si el plugin está instalado. Dependencia
         // blanda — si no está, el dashboard sigue calculando desde consultation_services.
         try {
+          // Solo cuentas de COBRO: sin el filtro, las salidas (payable) aparecían como
+          // "servicios más frecuentes" (COONG-249). El filtro cliente cubre billing viejos
+          // que ignoran el param `direction`.
           const [accts, lines] = await Promise.all([
             actions.execute<BillingAccount[]>('billing.accounts.listWithTotals'),
-            actions.execute<BillingLine[]>('billing.lines.listInRange'),
+            actions.execute<BillingLine[]>('billing.lines.listInRange', {
+              direction: 'receivable',
+            }),
           ]);
           if (!cancelled) {
             setBillingAccounts(Array.isArray(accts) ? accts : []);
-            setBillingLines(Array.isArray(lines) ? lines : []);
+            setBillingLines(
+              (Array.isArray(lines) ? lines : []).filter((l) => l.account_direction !== 'payable')
+            );
             setBillingOn(true);
           }
         } catch {
