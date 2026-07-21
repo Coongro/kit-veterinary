@@ -130,6 +130,12 @@
         "order": 10
       },
       {
+        "pluginId": "@coongro/vet-inventory",
+        "path": "Insumos",
+        "section": "inventario",
+        "order": 20
+      },
+      {
         "pluginId": "@coongro/vademecum",
         "path": "Laboratorios",
         "section": "equipo",
