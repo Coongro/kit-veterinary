@@ -125,15 +125,15 @@
       },
       {
         "pluginId": "@coongro/vet-inventory",
-        "path": "Lotes y stock",
+        "path": "Inventario",
         "section": "inventario",
         "order": 10
       },
       {
         "pluginId": "@coongro/vet-inventory",
         "path": "Insumos",
-        "section": "inventario",
-        "order": 20
+        "section": "clinica",
+        "order": 60
       },
       {
         "pluginId": "@coongro/vademecum",

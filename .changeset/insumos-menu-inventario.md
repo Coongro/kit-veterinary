@@ -2,6 +2,10 @@
 '@coongro/kit-veterinary': minor
 ---
 
-feat(menus): ubica «Insumos» en la sección Inventario (COONG-256)
+feat(menus): inventario unificado — reordena los menús de stock (COONG-263)
 
-Asigna el menú `Insumos` de `vet-inventory` a la sección **inventario**, con `order: 20` (después de "Lotes y stock"). Sin la asignación, un menú nuevo que el kit no conoce queda flotando arriba de todo, fuera de sus secciones.
+El kit ahora asigna los menús de `vet-inventory` así:
+- **Inventario** (antes "Lotes y stock"): sección `inventario`, order 10. Compone perecederos + insumos en una sola pantalla.
+- **Insumos** (catálogo de insumos): pasa a la sección `clinica`, order 60, junto a Pacientes/Consultas/Vacunación/Farmacia — es un catálogo, no una vista de stock.
+
+Sin esta asignación, los menús nuevos/renombrados de `vet-inventory` quedarían flotando fuera de sus secciones.
